@@ -1,0 +1,839 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { CheckInComplete } from '../components/pages/CheckInComplete';
+import { Home } from '../components/pages/Home';
+import { InstallmentSelection } from '../components/pages/InstallmentSelection';
+import { LetterSelection } from '../components/pages/LetterSelection';
+import { PatientConfirmation } from '../components/pages/PatientConfirmation';
+import { PatientList } from '../components/pages/PatientList';
+import { PaymentConfirmation } from '../components/pages/PaymentConfirmation';
+import { PaymentDecision } from '../components/pages/PaymentDecision';
+import { PaymentProcessing } from '../components/pages/PaymentProcessing';
+import { PaymentSuccess } from '../components/pages/PaymentSuccess';
+import { PhoneInput } from '../components/pages/PhoneInput';
+import { NameInput } from '../components/pages/NameInput';
+import { PhotoCapture } from '../components/pages/PhotoCapture';
+import { AsaasPixPayment } from '../components/pages/AsaasPixPayment';
+import { HelpTour } from '../components/HelpTour';
+import { Appointment as UIAppointment, PaymentMethod } from '../types';
+import {
+    appointmentAPI,
+    patientAPI,
+    paymentAPI,
+    type Appointment as ApiAppointment,
+    type Patient as ApiPatient,
+} from '../lib/api';
+import { API_BASE_URL } from '../lib/apiConfig';
+
+const buildAppointments = (apiAppointments: ApiAppointment[], patients: ApiPatient[]): UIAppointment[] => {
+    const patientMap = new Map<string, ApiPatient>();
+    patients.forEach((patient) => {
+        if (patient.id) {
+            patientMap.set(patient.id, patient);
+        }
+    });
+
+    return apiAppointments.map((apiAppointment) => {
+        const patientFromMap = apiAppointment.patientId ? patientMap.get(apiAppointment.patientId) : undefined;
+        const patient = {
+            id: patientFromMap?.id ?? apiAppointment.patientId ?? '',
+            name: patientFromMap?.name ?? apiAppointment.patient ?? 'Paciente',
+            cpf: patientFromMap?.cpf ?? apiAppointment.cpf,
+            phone: patientFromMap?.phone ?? '',
+        };
+
+        const rawAmount = apiAppointment.amount;
+        const amount = typeof rawAmount === 'string' ? Number(rawAmount) : rawAmount;
+
+        return {
+            id: apiAppointment.id ?? '',
+            patientId: apiAppointment.patientId,
+            patient,
+            doctor: apiAppointment.doctor,
+            specialty: apiAppointment.specialty,
+            date: apiAppointment.date,
+            time: apiAppointment.time,
+            status: apiAppointment.status,
+            paid: apiAppointment.paid,
+            amount: Number.isNaN(amount) ? 0 : amount,
+            cpf: apiAppointment.cpf,
+        };
+    });
+};
+import { Shield, Video } from 'lucide-react';
+import { notifyPaymentConfirmed } from '../lib/paymentBridge';
+import { LoginModal } from '../components/auth/LoginModal';
+
+type Screen =
+    | 'home'
+    | 'letterSelection'
+    | 'patientList'
+    | 'phoneInput'
+    | 'nameInput'
+    | 'patientConfirmation'
+    | 'photoCapture'
+    | 'checkInComplete'
+    | 'paymentLetterSelection'
+    | 'paymentPatientList'
+    | 'paymentPhoneInput'
+    | 'paymentConfirmation'
+    | 'paymentDecision'
+    | 'installmentSelection'
+    | 'paymentProcessing'
+    | 'paymentSuccess';
+
+export default function Page() {
+    const router = useRouter();
+    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+    const [isRestMode, setIsRestMode] = useState(false);
+    const [isVideoOpen, setIsVideoOpen] = useState(false);
+    const [isTourOpen, setIsTourOpen] = useState(false);
+    const inactivityTimer = useRef<number | null>(null);
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+    const restVideoRef = useRef<HTMLVideoElement | null>(null);
+    const INACTIVITY_MS = 5 * 60 * 1000; // 5 minutos (vídeo descanso após 5 min)
+
+    const [primaryVideoSrc, setPrimaryVideoSrc] = useState<string | null>(null);
+
+    const [currentScreen, setCurrentScreen] = useState<Screen>('home');
+    const [selectedLetter, setSelectedLetter] = useState<string>('');
+    const [appointments, setAppointments] = useState<UIAppointment[]>([]);
+    const [filteredAppointments, setFilteredAppointments] = useState<UIAppointment[]>([]);
+    const [selectedAppointment, setSelectedAppointment] = useState<UIAppointment | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+    const [installments, setInstallments] = useState<number>(1);
+    const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
+    const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
+    const [paymentDecisionMode, setPaymentDecisionMode] = useState<'checkin' | 'payment'>('payment');
+    const closeVideoOverlay = () => setIsVideoOpen(false);
+
+    const handleHelpClick = () => {
+        setIsTourOpen(true);
+    };
+    const refreshAppointmentsForSearch = async (): Promise<UIAppointment[] | null> => {
+        const token = typeof window !== 'undefined' ? window.localStorage.getItem('lv_token') : null;
+        const hasValidToken =
+            !!token && token !== 'undefined' && token !== 'null' && token.split('.').length === 3;
+        if (!hasValidToken) {
+            return null;
+        }
+        setIsLoadingAppointments(true);
+        setAppointmentsError(null);
+        try {
+            const [apiAppointments, patients] = await Promise.all([
+                appointmentAPI.getAll(),
+                patientAPI.getAll(),
+            ]);
+            const built = buildAppointments(apiAppointments, patients);
+            setAppointments(built);
+            return built;
+        } catch (error) {
+            console.error('Falha ao carregar agendamentos', error);
+            setAppointmentsError('Nao foi possivel carregar os agendamentos no momento.');
+            return null;
+        } finally {
+            setIsLoadingAppointments(false);
+        }
+    };
+
+    useEffect(() => {
+        let isActive = true;
+
+        const fetchAppointments = async () => {
+            // Só carrega dados se houver token (usuário autenticado)
+            const token = typeof window !== 'undefined' ? window.localStorage.getItem('lv_token') : null;
+            const hasValidToken =
+                !!token && token !== 'undefined' && token !== 'null' && token.split('.').length === 3;
+            if (!hasValidToken) {
+                console.log('[TOTEM] Sem token - aguardando login');
+                setIsLoadingAppointments(false);
+                return;
+            }
+
+            setIsLoadingAppointments(true);
+            setAppointmentsError(null);
+
+            try {
+                const [apiAppointments, patients] = await Promise.all([
+                    appointmentAPI.getAll(),
+                    patientAPI.getAll(),
+                ]);
+                if (!isActive) {
+                    return;
+                }
+                setAppointments(buildAppointments(apiAppointments, patients));
+            } catch (error) {
+                console.error('Falha ao carregar agendamentos', error);
+                if (!isActive) {
+                    return;
+                }
+                setAppointmentsError('Não foi possível carregar os agendamentos no momento.');
+            } finally {
+                if (isActive) {
+                    setIsLoadingAppointments(false);
+                }
+            }
+        };
+
+        fetchAppointments();
+
+        return () => {
+            isActive = false;
+        };
+    }, []);
+
+    // Carrega vídeos ativos para usar no modo descanso e overlay manual
+    useEffect(() => {
+        let cancelled = false;
+        const loadVideos = async () => {
+            try {
+            const res = await fetch('/api/videos/active');
+                const data = await res.json();
+                if (cancelled) return;
+                if (data?.success && Array.isArray(data.videos)) {
+                    const first = data.videos[0];
+                    if (first) {
+                        const derivedPath = first.filePath || (first.filename ? `/uploads/videos/${first.filename}` : null);
+                        setPrimaryVideoSrc(derivedPath);
+                    } else {
+                        setPrimaryVideoSrc(null);
+                    }
+                } else {
+                    setPrimaryVideoSrc(null);
+                }
+            } catch (error) {
+                console.warn('Erro ao carregar vídeos ativos', error);
+                if (!cancelled) setPrimaryVideoSrc(null);
+            }
+        };
+        loadVideos();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    // Inatividade: volta para modo descanso após 5 min sem interação
+    useEffect(() => {
+        const resetTimer = () => {
+            if (inactivityTimer.current) {
+                window.clearTimeout(inactivityTimer.current);
+            }
+            inactivityTimer.current = window.setTimeout(() => {
+                setIsRestMode(true);
+                resetFlow();
+            }, INACTIVITY_MS);
+        };
+
+        const handleActivity = () => {
+            if (isRestMode) return;
+            resetTimer();
+        };
+
+        const events = ['click', 'mousemove', 'keydown', 'touchstart'];
+        events.forEach((event) => window.addEventListener(event, handleActivity));
+        resetTimer();
+
+        return () => {
+            events.forEach((event) => window.removeEventListener(event, handleActivity));
+            if (inactivityTimer.current) {
+                window.clearTimeout(inactivityTimer.current);
+            }
+        };
+    }, [isRestMode]);
+
+    useEffect(() => {
+        const videoElement = videoRef.current;
+        if (!videoElement) {
+            return;
+        }
+
+        if (isVideoOpen) {
+            const playPromise = videoElement.play();
+            if (playPromise && typeof playPromise.catch === 'function') {
+                playPromise.catch(() => {
+                    /* autoplay bloqueado */
+                });
+            }
+        } else {
+            videoElement.pause();
+            videoElement.currentTime = 0;
+        }
+    }, [isVideoOpen]);
+
+    useEffect(() => {
+        if (isRestMode) {
+            setIsVideoOpen(false);
+        }
+    }, [isRestMode]);
+
+    useEffect(() => {
+        if (!isRestMode) {
+            return;
+        }
+        const videoElement = restVideoRef.current;
+        if (!videoElement) {
+            return;
+        }
+        videoElement.currentTime = 0;
+        const playPromise = videoElement.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch(() => {
+                /* autoplay bloqueado */
+            });
+        }
+        return () => {
+            videoElement.pause();
+            videoElement.currentTime = 0;
+        };
+    }, [isRestMode]);
+
+    const filterAppointmentsByLetter = (letter: string): UIAppointment[] => {
+        const normalizedLetter = letter.trim().toUpperCase();
+        if (!normalizedLetter) {
+            return [];
+        }
+        return appointments.filter((appointment) => {
+            const firstChar = appointment.patient.name?.[0]?.toUpperCase();
+            return firstChar === normalizedLetter;
+        });
+    };
+    const filterAppointmentsByCpf = (value: string, source: UIAppointment[] = appointments): UIAppointment[] => {
+        const digits = value.replace(/\D/g, '');
+        if (!digits) {
+            return source;
+        }
+
+        return source.filter((appointment) => {
+            const cpf = (appointment.patient.cpf || appointment.cpf || '').replace(/\D/g, '');
+            return cpf.includes(digits);
+        });
+    };
+
+    const isToday = (isoDate?: string) => {
+        if (!isoDate) return false;
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+        return isoDate === todayStr;
+    };
+
+    const filterAppointmentsByPhone = (phone: string, source: UIAppointment[] = appointments): UIAppointment[] => {
+        const cleanPhone = phone.replace(/\D/g, '');
+        if (!cleanPhone) {
+            return [];
+        }
+        return source.filter((appointment) => {
+            const patientPhone = appointment.patient.phone ?? '';
+            return patientPhone.replace(/\D/g, '').includes(cleanPhone);
+        });
+    };
+
+    const isAppointmentCheckedIn = (appointment: UIAppointment) =>
+        appointment.status?.toLowerCase() === 'confirmado' || appointment.status === 'CONFIRMADA';
+
+    const handleStartCheckIn = () => {
+        setCurrentScreen('letterSelection');
+    };
+
+    const handleSelectLetterCheckIn = (letter: string) => {
+        setSelectedLetter(letter);
+        const appointmentsByLetter = filterAppointmentsByLetter(letter)
+            .filter((appointment) => isToday(appointment.date))
+            .filter((appointment) => !isAppointmentCheckedIn(appointment));
+        setFilteredAppointments(appointmentsByLetter);
+        setCurrentScreen('patientList');
+    };
+
+    const handleSelectPatient = (appointment: UIAppointment) => {
+        setSelectedAppointment(appointment);
+        setCurrentScreen('patientConfirmation');
+    };
+
+    const handleNotFoundCheckIn = () => {
+        setCurrentScreen('nameInput');
+    };
+
+    const handlePhoneSubmit = async (phone: string) => {
+        const refreshed = await refreshAppointmentsForSearch();
+        const source = refreshed && refreshed.length ? refreshed : appointments;
+        const appointmentsByPhone = filterAppointmentsByPhone(phone, source)
+            .filter((appointment) => !isAppointmentCheckedIn(appointment));
+        setFilteredAppointments(appointmentsByPhone);
+        setCurrentScreen('patientList');
+    };
+
+    const handleCpfSubmit = async (cpfValue: string) => {
+        const refreshed = await refreshAppointmentsForSearch();
+        const source = refreshed && refreshed.length ? refreshed : appointments;
+        const byCpf = filterAppointmentsByCpf(cpfValue, source)
+            .filter((appointment) => !isAppointmentCheckedIn(appointment));
+        setFilteredAppointments(byCpf);
+        setCurrentScreen('patientList');
+    };
+
+    const handleSelectSuggestion = (apt: UIAppointment) => {
+        setSelectedAppointment(apt);
+        setCurrentScreen('patientConfirmation');
+    };
+
+    const handleConfirmPatient = async () => {
+        // Atualizar status do agendamento para "confirmado"
+        if (selectedAppointment?.id) {
+            try {
+                await appointmentAPI.updateStatus(selectedAppointment.id, 'confirmado');
+                // Atualizar o estado local
+                setAppointments(prev => prev.map(apt =>
+                    apt.id === selectedAppointment.id ? { ...apt, status: 'confirmado' } : apt
+                ));
+                setSelectedAppointment(prev => prev ? { ...prev, status: 'confirmado' } : null);
+            } catch (error) {
+                console.error('Erro ao atualizar status:', error);
+            }
+        }
+        // Proceed to photo capture to confirm chegada
+        setCurrentScreen('photoCapture');
+    };
+
+    const handlePhotoCapture = async (dataUrl?: string) => {
+        // Upload photo; keep flow open for payment if pending. Only change status after payment.
+        if (selectedAppointment?.id) {
+            try {
+                if (dataUrl) {
+                    const res = await fetch(dataUrl);
+                    const blob = await res.blob();
+                    await appointmentAPI.uploadPhoto(selectedAppointment.id, blob);
+                }
+            } catch (e) {
+                console.error('Falha ao enviar foto', e);
+            }
+        }
+        // If there is pending payment, go to payment confirmation; otherwise finish check-in
+        if (selectedAppointment && !selectedAppointment.paid && (selectedAppointment.amount ?? 0) > 0) {
+            setPaymentDecisionMode('checkin');
+            setCurrentScreen('paymentDecision');
+        } else {
+            setCurrentScreen('checkInComplete');
+        }
+    };
+
+    const handleCheckInComplete = () => {
+        resetFlow();
+    };
+
+    const handleSelectLetterPayment = (letter: string) => {
+        setSelectedLetter(letter);
+        const unpaidAppointments = filterAppointmentsByLetter(letter).filter(
+            (appointment) => !appointment.paid
+        );
+        setFilteredAppointments(unpaidAppointments);
+        setCurrentScreen('paymentPatientList');
+    };
+
+    const handleSelectPatientPayment = (appointment: UIAppointment) => {
+        setSelectedAppointment(appointment);
+        setPaymentMethod(null);
+        setPaymentDecisionMode('payment');
+        setCurrentScreen('paymentDecision');
+    };
+
+    const handlePaymentDecisionAwait = () => {
+        if (paymentDecisionMode === 'checkin') {
+            setCurrentScreen('checkInComplete');
+        } else {
+            resetFlow();
+        }
+    };
+
+    const handlePaymentDecisionBack = () => {
+        resetFlow();
+    };
+
+    const handleProceedToPayment = () => {
+        setCurrentScreen('paymentConfirmation');
+    };
+
+    const handlePayAfterCheckIn = () => {
+        if (!selectedAppointment) {
+            return;
+        }
+        setPaymentDecisionMode('checkin');
+        setPaymentMethod(null);
+        setCurrentScreen('paymentConfirmation');
+    };
+
+    const handleNotFoundPayment = () => {
+        setCurrentScreen('paymentPhoneInput');
+    };
+
+    const handlePhoneSubmitPayment = async (phone: string) => {
+        const refreshed = await refreshAppointmentsForSearch();
+        const source = refreshed && refreshed.length ? refreshed : appointments;
+        const unpaidAppointments = filterAppointmentsByPhone(phone, source).filter(
+            (appointment) => !appointment.paid
+        );
+        setFilteredAppointments(unpaidAppointments);
+        setCurrentScreen('paymentPatientList');
+    };
+
+    const handleSelectPaymentMethod = (method: PaymentMethod) => {
+        setPaymentMethod(method);
+        setInstallments(1);
+        setCurrentScreen('paymentProcessing');
+    };
+    const handleSelectInstallment = (installmentCount: number) => {
+        setInstallments(installmentCount);
+        setCurrentScreen('paymentProcessing');
+    };
+
+    const handlePaymentComplete = async () => {
+        if (!selectedAppointment) {
+            setCurrentScreen('paymentSuccess');
+            return;
+        }
+
+        const appointmentId = selectedAppointment.id;
+        if (!appointmentId) {
+            setCurrentScreen('paymentSuccess');
+            return;
+        }
+
+        try {
+            await paymentAPI.process({
+                appointmentId,
+                amount: selectedAppointment.amount,
+                method: paymentMethod ?? 'pix',
+            });
+
+            setAppointments((prev) =>
+                prev.map((apt) =>
+                    apt.id === appointmentId
+                        ? { ...apt, paid: true, status: 'EM_ATENDIMENTO' }
+                        : apt
+                )
+            );
+
+            setSelectedAppointment((prev) =>
+                prev && prev.id === appointmentId
+                    ? { ...prev, paid: true, status: 'EM_ATENDIMENTO' }
+                    : prev
+            );
+
+            setFilteredAppointments((prev) =>
+                prev.filter((apt) => apt.id !== appointmentId)
+            );
+
+            notifyPaymentConfirmed({
+                appointmentId,
+                cpf: selectedAppointment.patient.cpf,
+                amount: selectedAppointment.amount,
+            });
+        } catch (error) {
+            console.error('Erro ao processar pagamento', error);
+        } finally {
+            setCurrentScreen('paymentSuccess');
+        }
+    };
+
+    const handlePaymentSuccess = () => {
+        resetFlow();
+    };
+
+    const openAdminDialog = () => {
+        setIsLoginModalOpen(true);
+    };
+
+    const handleLoginSuccess = (user: any) => {
+        localStorage.setItem('user', JSON.stringify(user));
+        router.push('/system');
+    };
+
+    const resetFlow = () => {
+        setCurrentScreen('home');
+        setSelectedLetter('');
+        setFilteredAppointments([]);
+        setSelectedAppointment(null);
+        setPaymentMethod(null);
+        setInstallments(1);
+        setPaymentDecisionMode('payment');
+    };
+
+    const exitRestMode = () => {
+        setIsRestMode(false);
+        resetFlow();
+    };
+
+    const renderScreen = () => {
+        switch (currentScreen) {
+            case 'home':
+                return <Home onCheckIn={handleStartCheckIn} onHelpClick={handleHelpClick} />;
+
+            case 'letterSelection':
+                return <LetterSelection flow="checkin" onSelectLetter={handleSelectLetterCheckIn} onBack={resetFlow} />;
+
+            case 'patientList':
+                return (
+                    <PatientList
+                        appointments={filteredAppointments}
+                        onSelectPatient={handleSelectPatient}
+                        onNotFound={handleNotFoundCheckIn}
+                        onBack={resetFlow}
+                    />
+                );
+
+            case 'phoneInput':
+                return (
+                    <PhoneInput
+                        onSubmit={handlePhoneSubmit}
+                        onBack={resetFlow}
+                        flow="checkin"
+                    />
+                );
+
+            case 'nameInput':
+                return (
+                    <NameInput
+                        appointments={appointments}
+                        onSubmit={handleCpfSubmit}
+                        onSelectAppointment={handleSelectSuggestion}
+                        onBack={resetFlow}
+                        onHelpClick={handleHelpClick}
+                    />
+                );
+
+            case 'patientConfirmation':
+                return selectedAppointment ? (
+                    <PatientConfirmation
+                        appointment={selectedAppointment}
+                        onConfirm={handleConfirmPatient}
+                        onBack={resetFlow}
+                    />
+                ) : null;
+
+            case 'photoCapture':
+                return <PhotoCapture onCapture={handlePhotoCapture} />;
+
+            case 'checkInComplete':
+                return selectedAppointment ? (
+                    <CheckInComplete
+                        appointment={selectedAppointment}
+                        onFinish={handleCheckInComplete}
+                        onPayNow={handlePayAfterCheckIn}
+                    />
+                ) : null;
+
+            case 'paymentLetterSelection':
+                return (
+                    <LetterSelection
+                        flow="payment"
+                        onSelectLetter={handleSelectLetterPayment}
+                        onBack={resetFlow}
+                    />
+                );
+
+            case 'paymentPatientList':
+                return (
+                    <PatientList
+                        appointments={filteredAppointments}
+                        onSelectPatient={handleSelectPatientPayment}
+                        onNotFound={handleNotFoundPayment}
+                        onBack={resetFlow}
+                        isPaymentFlow
+                    />
+                );
+
+            case 'paymentPhoneInput':
+                return (
+                    <PhoneInput
+                        flow="payment"
+                        onSubmit={handlePhoneSubmitPayment}
+                        onBack={resetFlow}
+                    />
+                );
+
+            case 'paymentDecision':
+                return selectedAppointment ? (
+                    <PaymentDecision
+                        appointment={selectedAppointment}
+                        onAwait={handlePaymentDecisionAwait}
+                        onProceed={handleProceedToPayment}
+                        onBack={handlePaymentDecisionBack}
+                        mode={paymentDecisionMode}
+                    />
+                ) : null;
+
+            case 'paymentConfirmation':
+                return selectedAppointment ? (
+                    <PaymentConfirmation
+                        flow={paymentDecisionMode === 'checkin' ? 'checkin' : 'payment'}
+                        appointment={selectedAppointment}
+                        onSelectMethod={handleSelectPaymentMethod}
+                        onBack={resetFlow}
+                    />
+                ) : null;
+
+            case 'installmentSelection':
+                return selectedAppointment ? (
+                    <InstallmentSelection
+                        flow={paymentDecisionMode === 'checkin' ? 'checkin' : 'payment'}
+                        amount={selectedAppointment.amount}
+                        onSelectInstallment={handleSelectInstallment}
+                        onBack={resetFlow}
+                    />
+                ) : null;
+
+            case 'paymentProcessing':
+                if (paymentMethod === 'pix' && selectedAppointment) {
+                    return (
+                        <AsaasPixPayment
+                            flow={paymentDecisionMode === 'checkin' ? 'checkin' : 'payment'}
+                            appointmentId={selectedAppointment.id}
+                            onComplete={handlePaymentComplete}
+                            onBack={resetFlow}
+                        />
+                    );
+                }
+                return paymentMethod ? (
+                    <PaymentProcessing
+                        flow={paymentDecisionMode === 'checkin' ? 'checkin' : 'payment'}
+                        method={paymentMethod}
+                        installments={installments}
+                        onComplete={handlePaymentComplete}
+                        onBack={() => setCurrentScreen('paymentConfirmation')}
+                    />
+                ) : null;
+
+            case 'paymentSuccess':
+                return <PaymentSuccess flow={paymentDecisionMode === 'checkin' ? 'checkin' : 'payment'} onFinish={handlePaymentSuccess} />;
+
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-[#F8F6F1]">
+            <div className="min-h-screen">
+                <div className="flex min-h-screen w-full flex-col justify-center">
+                    {isLoadingAppointments && (
+                        <div className="mb-4 px-4 text-center text-sm text-[#4A4A4A]/80">
+                            Carregando agendamentos...
+                        </div>
+                    )}
+                    {appointmentsError && (
+                        <div className="mb-4 px-4 text-center text-sm text-red-600">
+                            {appointmentsError}
+                        </div>
+                    )}
+                    {renderScreen()}
+                </div>
+            </div>
+
+            {isRestMode && (
+                <div
+                    className="fixed inset-0 z-30 flex items-center justify-center bg-black"
+                    onClick={exitRestMode}
+                    role="button"
+                    aria-label="Toque no vídeo para iniciar um novo atendimento"
+                >
+                    {primaryVideoSrc ? (
+                        <>
+                            <video
+                                ref={restVideoRef}
+                                className="absolute inset-0 h-full w-full object-cover"
+                                muted
+                                loop
+                                playsInline
+                                autoPlay
+                                preload="auto"
+                            >
+                                <source src={primaryVideoSrc} type="video/mp4" />
+                                Seu navegador não suporta vídeo.
+                            </video>
+                            <div className="pointer-events-none absolute inset-0 bg-black/35" />
+                            <div className="pointer-events-none relative z-10 flex flex-col items-center gap-4 text-center text-white">
+                                <div className="rounded-full bg-black/50 px-6 py-3 text-lg font-medium">
+                                    Toque no vídeo para voltar ao início
+                                </div>
+                                <div className="h-12 w-12 animate-pulse rounded-full border-2 border-white/60" />
+                            </div>
+                        </>
+                    ) : (
+                        <div className="relative z-10 flex flex-col items-center gap-4 text-center text-white">
+                            <div className="rounded-full bg-black/50 px-6 py-3 text-lg font-medium">
+                                Nenhum vídeo disponível no momento
+                            </div>
+                            <div className="text-sm text-white/70">Toque para voltar</div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {isVideoOpen && primaryVideoSrc && (
+                <div
+                    className="fixed inset-0 z-30 flex items-center justify-center bg-black/90 px-4"
+                    role="dialog"
+                    aria-label="Vídeo institucional em tela cheia"
+                    onClick={closeVideoOverlay}
+                >
+                    <button
+                        type="button"
+                        onClick={closeVideoOverlay}
+                        className="absolute top-6 right-6 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 text-white transition hover:bg-white/15"
+                        aria-label="Fechar vídeo"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 6L18 18M6 18L18 6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </button>
+                    <video
+                        ref={videoRef}
+                        controls
+                        autoPlay
+                        preload="metadata"
+                        className="h-full w-full rounded-[28px] border border-white/30 object-cover shadow-2xl max-w-5xl"
+                    >
+                        <source src={primaryVideoSrc} type="video/mp4" />
+                        Seu navegador não suporta vídeo.
+                    </video>
+                </div>
+            )}
+
+            <div className="fixed bottom-6 right-6 z-20 flex flex-col items-end gap-3">
+                <button
+                    type="button"
+                    className="flex h-12 w-12 items-center justify-center rounded-full border text-white shadow-[0_15px_30px_rgba(140,86,60,0.25)] transition hover:scale-[1.03] disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ borderColor: 'rgba(224,198,178,0.6)', backgroundColor: 'rgba(214,170,146,0.6)' }}
+                    onClick={() => primaryVideoSrc && setIsVideoOpen(true)}
+                    aria-label="Assistir vídeo institucional"
+                    disabled={!primaryVideoSrc}
+                >
+                    <Video size={20} />
+                </button>
+
+                <button
+                    className="flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_10px_20px_rgba(0,0,0,0.2)] transition hover:scale-[1.03]"
+                    style={{ backgroundColor: 'rgba(214,170,146,0.4)', borderColor: 'rgba(224,198,178,0.5)' }}
+                    onClick={openAdminDialog}
+                    aria-label="Abrir modo ADM"
+                >
+                    <Shield size={16} className="text-white" />
+                </button>
+            </div>
+
+            <LoginModal
+                open={isLoginModalOpen}
+                onClose={() => setIsLoginModalOpen(false)}
+                onSuccess={handleLoginSuccess}
+            />
+
+            <HelpTour
+                isOpen={isTourOpen}
+                onClose={() => setIsTourOpen(false)}
+            />
+        </div>
+    );
+}

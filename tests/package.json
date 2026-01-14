@@ -1,0 +1,23 @@
+{
+  "name": "luna-integration-tests",
+  "version": "1.0.0",
+  "description": "Testes de integração automatizados para Sistema Luna",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test-runner.js",
+    "test:auth": "node tests/auth.test.js",
+    "test:tenant": "node tests/tenant.test.js",
+    "test:modules": "node tests/modules.test.js",
+    "test:e2e": "node tests/e2e.test.js",
+    "test:all": "node test-runner.js --all"
+  },
+  "keywords": ["luna", "integration", "tests"],
+  "author": "Luna Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "pg": "^8.11.0",
+    "bcrypt": "^5.1.1"
+  },
+  "devDependencies": {}
+}

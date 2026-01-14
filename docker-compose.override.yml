@@ -1,0 +1,12 @@
+services:
+  lunacore:
+    environment:
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=validate
+  totemapi:
+    environment:
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=validate
+      - SPRING_AUTOCONFIGURE_EXCLUDE=org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration,org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  lunapay:
+    environment:
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=validate
+

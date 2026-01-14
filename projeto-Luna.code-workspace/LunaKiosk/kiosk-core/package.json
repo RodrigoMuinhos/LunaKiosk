@@ -1,0 +1,31 @@
+{
+  "name": "@luna/kiosk-core",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev:demo": "node --enable-source-maps --loader ts-node/esm src/dev/runDemo.ts",
+    "dev:v2": "node --enable-source-maps --loader ts-node/esm scripts/startAll.ts",
+    "dev:bridges": "node --enable-source-maps --loader ts-node/esm scripts/startBridges.ts",
+    "dev:sync-mock": "node --enable-source-maps --loader ts-node/esm sync-mock-server/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "sql.js": "^1.13.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "LunaKiosk",
+    "slug": "lunakiosk",
+    "version": "0.1.0",
+    "scheme": "lunakiosk",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      "expo-asset",
+      "expo-secure-store"
+    ],
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

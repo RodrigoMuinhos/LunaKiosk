@@ -1,0 +1,123 @@
+### ================================
+### LunaVita / OrquestradorLuna
+### Root .gitignore (monorepo)
+### ================================
+
+### Environment / secrets
+.env
+.env.*
+!.env.example
+
+### Logs / reports / runtime output
+*.log
+*.log.*
+*.gz
+*.tgz
+*.zip
+logs/
+reports/
+**/logs/
+**/reports/
+**/backend-dev-*.txt
+**/dev-err*.txt
+**/dev-log*.txt
+
+### Local-only notes / reports (do NOT version)
+DELIVERABLES.txt
+INSTRUCOES-MANUAL.txt
+RELATORIO-*.md
+RESUMO-*.txt
+RETROSPECTIVA*.md
+
+### Local-only helper scripts (do NOT version)
+DIAG-8080.ps1
+docker.ps1
+run-e2e.ps1
+START-*.ps1
+STOP-*.ps1
+CLEAN-ARTIFACTS.ps1
+
+### Temp scratch files
+tmp_*
+**/tmp_*
+
+### Local docker overrides (temp)
+docker-compose.override-temp.yml
+
+### Node / Next.js
+**/node_modules/
+**/.next/
+**/out/
+**/dist/
+**/build/
+**/out-*/
+**/dist-*/
+**/build-*/
+**/*.tsbuildinfo
+
+### Java / Maven / Gradle
+**/target/
+**/*.jar
+**/*.class
+.mvn/
+
+### Kiosk runtime data (local)
+.kioskdata-debug/
+.kioskdata-unpacked/
+
+### Uploads / media
+uploads/
+**/uploads/**
+!**/uploads/**/.gitkeep
+**/*.mp4
+
+### Backups / temp / generated
+*.tmp
+*.temp
+*.swp
+*.bak
+*.bak-*
+*.bak*
+*.old
+docker-compose*.bak-*
+**/Dockerfile.bak-*
+*.backup
+*.backup.*
+
+### Archives / deliverables
+KIT-CLIENTE.zip
+
+### Client kit (local-only)
+KIT-CLIENTE/
+
+### Electron/Windows packaging artifacts
+**/win-unpacked/
+
+### Kiosk Electron - bundled runtime/build output (do NOT version)
+# The Electron packaging pipeline may drop a full JRE here; it's massive and should be produced by build scripts.
+**/kiosk-electron/resources/jre/
+**/kiosk-electron/web-build/
+**/kiosk-electron/next-out/
+**/kiosk-electron/next-standalone/
+
+### Expo (React Native) local state
+**/.expo/
+
+### IDE / OS
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+Thumbs.db
+
+### Optional: keep docs in archive, but ignore generated stuff inside it
+archive/**/node_modules/
+archive/**/.next/
+archive/**/dist/
+archive/**/out/
+archive/**/target/
+
+### Legacy archive (may contain credential notes/scripts) - keep local only
+archive/

@@ -1,0 +1,110 @@
+spring:
+  application:
+    name: lunapay
+  datasource:
+    # Neon PostgreSQL (production): lunapay_db
+    # Local dev fallback: H2 in-memory
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:lunapay;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.h2.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        show_sql: true
+    show-sql: true
+
+  h2:
+    console:
+      enabled: true
+
+server:
+  port: ${PORT:8080}
+
+jwt:
+  # Defina JWT_SECRET no ambiente. Este default é APENAS para dev local.
+  secret: ${JWT_SECRET:dev-only-change-me}
+
+logging:
+  level:
+    com.luna.pay: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+payment:
+  gateways:
+    asaas:
+      enabled: true
+      environment: ${ASAAS_ENVIRONMENT:sandbox}
+      # API Key dinâmica baseada no ambiente
+      apiKey: ${ASAAS_SANDBOX_API_KEY:}
+      walletId: ${ASAAS_SANDBOX_WALLET_ID:}
+      baseUrl: https://sandbox.asaas.com/api/v3
+      webhookSecret: ${ASAAS_WEBHOOK_SECRET:}
+      timeoutSeconds: 30
+    c6:
+      enabled: ${C6_ENABLED:false}
+      apiKey: ${C6_API_KEY:}
+      apiSecret: ${C6_API_SECRET:}
+      baseUrl: ${C6_BASE_URL:https://api.c6bank.com.br}
+      webhookSecret: ${C6_WEBHOOK_SECRET:}
+      timeoutSeconds: 30
+
+---
+# Production profile para Asaas
+spring:
+  config:
+    activate:
+      on-profile: production
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:lunapay;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        show_sql: false
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+logging:
+  level:
+    root: WARN
+    com.luna.pay: INFO
+    com.luna.pay.gateway: WARN
+    com.luna.pay.gateway.asaas: WARN
+    com.luna.pay.gateway.asaas.webhook: WARN
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.hibernate.SQL: OFF
+    org.hibernate.type.descriptor.sql.BasicBinder: OFF
+
+logging:
+  level:
+    com.luna.pay: INFO
+    org.springframework.web: WARN
+    org.springframework.security: INFO
+
+payment:
+  gateways:
+    asaas:
+      enabled: true
+      environment: ${ASAAS_ENVIRONMENT:production}
+      apiKey: ${ASAAS_PROD_API_KEY:}
+      walletId: ${ASAAS_PROD_WALLET_ID:}
+      baseUrl: https://api.asaas.com/v3
+      webhookSecret: ${ASAAS_WEBHOOK_SECRET:}

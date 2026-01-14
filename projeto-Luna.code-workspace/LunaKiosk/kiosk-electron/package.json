@@ -1,0 +1,76 @@
+{
+  "name": "lunakiosk-electron",
+  "private": true,
+  "version": "1.0.1",
+  "description": "LunaKiosk - Sistema de Autoatendimento",
+  "author": "Luna Healthcare",
+  "main": "main.cjs",
+  "scripts": {
+    "dev": "cross-env ELECTRON_RENDERER_URL=http://localhost:19006 electron .",
+    "start": "electron .",
+    "sync:backend": "node ./scripts/sync-backend-artifacts.mjs",
+    "sync:totemui": "node ./scripts/sync-totemui-standalone.mjs",
+    "sync:jre": "powershell -ExecutionPolicy Bypass -NoProfile -File ./scripts/prepare-jre.ps1",
+    "verify:artifacts": "node ./scripts/verify-artifacts.mjs",
+    "build:tagged": "node ./scripts/build-tagged.mjs",
+    "bump:patch": "npm version patch --no-git-tag-version",
+    "bump:minor": "npm version minor --no-git-tag-version",
+    "bump:major": "npm version major --no-git-tag-version",
+    "build": "npm run build:tagged",
+    "release:patch": "npm run bump:patch && npm run build",
+    "release:minor": "npm run bump:minor && npm run build",
+    "build:all": "npm run sync:jre && npm run sync:backend && npm run sync:totemui && npm run verify:artifacts && electron-builder --win --mac --linux"
+  },
+  "build": {
+    "appId": "com.luna.kiosk",
+    "productName": "LunaKiosk",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "backendManager.cjs"
+    ],
+    "extraResources": [
+      {
+        "from": "next-standalone",
+        "to": "next-standalone"
+      },
+      {
+        "from": "backend-jars",
+        "to": "backend-jars"
+      },
+      {
+        "from": "resources/jre",
+        "to": "jre"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "perMachine": false,
+      "artifactName": "LunaKiosk-Setup-v${version}-${env.BUILD_TAG}-${arch}.exe"
+    },
+    "portable": {
+      "artifactName": "LunaKiosk-Portable-v${version}-${env.BUILD_TAG}-${arch}.exe"
+    }
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  }
+}
