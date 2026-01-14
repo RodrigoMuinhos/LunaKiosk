@@ -11,14 +11,11 @@ RUN apk add --no-cache maven
 # Copy pom first for better layer caching
 COPY pom.xml ./
 
-# Download dependencies (cached layer)
-RUN mvn -B -q dependency:go-offline
-
 # Copy source code
 COPY src ./src
 
 # Build application (skip tests for faster builds)
-RUN mvn -B -q clean package -DskipTests
+RUN mvn -B clean package -DskipTests
 
 # Stage 2: Runtime
 FROM eclipse-temurin:21-jre-alpine
