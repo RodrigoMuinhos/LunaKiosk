@@ -71,6 +71,14 @@ uploads/
 !**/uploads/**/.gitkeep
 **/*.mp4
 
+### Local databases
+*.db
+*.sqlite
+*.sqlite3
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+
 ### Backups / temp / generated
 *.tmp
 *.temp
