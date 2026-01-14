@@ -21,6 +21,10 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import com.luna.core.proxy.config.TotemApiProperties;
 
 @Configuration
@@ -94,13 +98,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // TotemUI pode rodar via localhost, 127.0.0.1 (Docker/healthcheck) e também no kiosk (Electron)
-        config.setAllowedOriginPatterns(java.util.List.of(
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:19007",
-            "http://127.0.0.1:19007"
-        ));
+        // TotemUI pode rodar via localhost, 127.0.0.1 (Docker/healthcheck), kiosk (Electron) e também via Vercel.
+        // Em produção (Vercel -> Railway via proxy), o backend recebe o Origin do Vercel.
+        config.setAllowedOriginPatterns(getAllowedOriginPatterns());
         config.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(java.util.List.of("Authorization", "Content-Type", "Origin", "Accept", "X-Requested-With"));
         config.setAllowCredentials(true);
@@ -108,6 +108,36 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    /**
+     * Lista de origins (patterns) permitidas via CORS.
+     *
+     * Opcionalmente configurável por env var: LUNA_CORS_ALLOWED_ORIGIN_PATTERNS
+     * Exemplo:
+     *   https://luna-kiosk.vercel.app,https://*.vercel.app,http://localhost:3000
+     */
+    private static List<String> getAllowedOriginPatterns() {
+        String raw = System.getenv("LUNA_CORS_ALLOWED_ORIGIN_PATTERNS");
+        if (raw != null && !raw.isBlank()) {
+            List<String> patterns = new ArrayList<>();
+            Arrays.stream(raw.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .forEach(patterns::add);
+            if (!patterns.isEmpty()) {
+                return patterns;
+            }
+        }
+
+        return List.of(
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "http://localhost:19007",
+                "http://127.0.0.1:19007",
+                // Vercel (prod e previews). Se você usar domínio custom, adicione via env var.
+                "https://*.vercel.app"
+        );
     }
 
     @Bean

@@ -71,6 +71,14 @@ Em **cada** service, configure (mínimo):
 
 E também:
 
+#### `lunacore`
+
+- `SPRING_PROFILES_ACTIVE=production`
+- (opcional) `LUNA_CORS_ALLOWED_ORIGIN_PATTERNS=https://*.vercel.app,https://SEU-DOMINIO-CUSTOM.com,http://localhost:3000`
+
+> Observação: mesmo usando proxy do Vercel (`/api/auth/*` → `lunacore`), o Vercel normalmente encaminha o header `Origin`.
+> Se o `lunacore` não permitir o origin do seu TotemUI, você verá `403 Invalid CORS request` no login.
+
 #### `totemapi`
 
 - `SPRING_PROFILES_ACTIVE=production` (ou `docker`, conforme sua config)
