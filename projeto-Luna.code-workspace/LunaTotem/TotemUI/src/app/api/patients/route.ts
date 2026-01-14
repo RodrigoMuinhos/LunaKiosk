@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+import { buildTargetUrlFromRequest, getTotemApiBaseUrl, proxyTo } from '../_proxy';
+
 import {
   createPatientId,
   normalizeCpf,
@@ -20,12 +22,20 @@ function sanitizePatients(list: PatientRecord[]) {
   return list.map(sanitizePatient);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(request, buildTargetUrlFromRequest(request, baseUrl));
+  }
   const patients = await readPatients();
   return NextResponse.json(sanitizePatients(patients));
 }
 
 export async function POST(request: Request) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(request, buildTargetUrlFromRequest(request, baseUrl));
+  }
   try {
     const body = await request.json();
     const name = String(body?.name ?? '').trim();

@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server';
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+import { buildTargetUrlFromRequest, getTotemApiBaseUrl, proxyTo } from '../_proxy';
 import {
   ALLOWED_ROLES,
   normalizeCpf,
@@ -10,12 +14,20 @@ import {
   nextUserId,
 } from './userStore';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(request, buildTargetUrlFromRequest(request, baseUrl));
+  }
   const users = await readUsers();
   return NextResponse.json(sanitizeUsers(users));
 }
 
 export async function POST(request: Request) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(request, buildTargetUrlFromRequest(request, baseUrl));
+  }
   try {
     const body = await request.json();
     const email = (body?.email ?? '').trim();

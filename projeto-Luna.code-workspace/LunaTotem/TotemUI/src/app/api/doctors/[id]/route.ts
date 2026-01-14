@@ -3,11 +3,16 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import type { Doctor } from '@/lib/api';
+import { buildTargetUrlFromRequest, getTotemApiBaseUrl, proxyTo } from '../../_proxy';
 import { readDoctors, writeDoctors } from '../doctorStore';
 
 type Params = { params: { id: string } };
 
 export async function GET(_: Request, { params }: Params) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(_, buildTargetUrlFromRequest(_, baseUrl));
+  }
   const doctors = await readDoctors();
   const doctor = doctors.find((doc) => doc.id === params.id);
   if (!doctor) {
@@ -17,6 +22,10 @@ export async function GET(_: Request, { params }: Params) {
 }
 
 export async function PUT(request: Request, { params }: Params) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(request, buildTargetUrlFromRequest(request, baseUrl));
+  }
   try {
     const payload = (await request.json()) as Partial<Doctor>;
     const doctors = await readDoctors();
@@ -66,6 +75,10 @@ export async function PUT(request: Request, { params }: Params) {
 }
 
 export async function DELETE(_: Request, { params }: Params) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(_, buildTargetUrlFromRequest(_, baseUrl));
+  }
   const doctors = await readDoctors();
   const index = doctors.findIndex((doc) => doc.id === params.id);
   if (index === -1) {

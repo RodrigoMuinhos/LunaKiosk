@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+import { buildTargetUrlFromRequest, getTotemApiBaseUrl, proxyTo } from '../../_proxy';
+
 import {
   normalizeCpf,
   normalizePhone,
@@ -22,6 +24,11 @@ function sanitize(patient: PatientRecord) {
 }
 
 export async function GET(_: Request, { params }: Params) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    // Use the incoming request URL for correct path + query.
+    return proxyTo(_, buildTargetUrlFromRequest(_, baseUrl));
+  }
   const patients = await readPatients();
   const patient = patients.find((item) => item.id === params.id);
   if (!patient) {
@@ -31,6 +38,10 @@ export async function GET(_: Request, { params }: Params) {
 }
 
 export async function PUT(request: Request, { params }: Params) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(request, buildTargetUrlFromRequest(request, baseUrl));
+  }
   try {
     const payload = await request.json();
     const patients = await readPatients();
@@ -94,6 +105,10 @@ export async function PUT(request: Request, { params }: Params) {
 }
 
 export async function DELETE(_: Request, { params }: Params) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(_, buildTargetUrlFromRequest(_, baseUrl));
+  }
   const patients = await readPatients();
   const index = patients.findIndex((item) => item.id === params.id);
   if (index === -1) {

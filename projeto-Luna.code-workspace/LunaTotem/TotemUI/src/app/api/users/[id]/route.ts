@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server';
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+import { buildTargetUrlFromRequest, getTotemApiBaseUrl, proxyTo } from '../../_proxy';
 import {
   ALLOWED_ROLES,
   normalizeCpf,
@@ -15,6 +19,10 @@ type Params = {
 };
 
 export async function GET(_: Request, { params }: Params) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(_, buildTargetUrlFromRequest(_, baseUrl));
+  }
   const id = Number(params.id);
   const users = await readUsers();
   const user = users.find((item) => item.id === id);
@@ -25,6 +33,10 @@ export async function GET(_: Request, { params }: Params) {
 }
 
 export async function PUT(request: Request, { params }: Params) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(request, buildTargetUrlFromRequest(request, baseUrl));
+  }
   const id = Number(params.id);
   const payload = await request.json();
   const users = await readUsers();
@@ -78,6 +90,10 @@ export async function PUT(request: Request, { params }: Params) {
 }
 
 export async function DELETE(_: Request, { params }: Params) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(_, buildTargetUrlFromRequest(_, baseUrl));
+  }
   const id = Number(params.id);
   const users = await readUsers();
   const index = users.findIndex((item) => item.id === id);

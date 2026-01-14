@@ -3,14 +3,23 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import type { Doctor } from '@/lib/api';
+import { buildTargetUrlFromRequest, getTotemApiBaseUrl, proxyTo } from '../_proxy';
 import { createDoctorId, readDoctors, writeDoctors } from './doctorStore';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(request, buildTargetUrlFromRequest(request, baseUrl));
+  }
   const doctors = await readDoctors();
   return NextResponse.json(doctors);
 }
 
 export async function POST(request: Request) {
+  const baseUrl = getTotemApiBaseUrl();
+  if (baseUrl) {
+    return proxyTo(request, buildTargetUrlFromRequest(request, baseUrl));
+  }
   try {
     const payload = (await request.json()) as Partial<Doctor>;
     const name = String(payload.name ?? '').trim();
