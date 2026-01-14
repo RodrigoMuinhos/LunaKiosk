@@ -16,6 +16,24 @@ Assim você evita CORS, e não precisa expor LunaCore/LunaPay diretamente para o
 
 ## 1) Railway (Backends)
 
+### Monorepo no Railway (1 repo → 3 services)
+
+Você **não precisa dividir o repositório** no GitHub.
+
+No Railway você cria **vários Services apontando para o mesmo repo**, e em **cada Service** você configura o **Root Directory** (pasta base) para o backend correspondente.
+
+> Se o Root Directory ficar vazio, o Railway vai tentar buildar o **repo root**.
+> Como o repo root tem `package.json`, ele pode detectar **Node** e falhar com:
+> `Detected Node` / `No start command was found`.
+
+Passo-a-passo (Railway UI):
+
+1. Railway → Project → **New Service**
+2. **GitHub Repo** → selecione `RodrigoMuinhos/LunaKiosk` (branch `main`)
+3. Depois de criar o Service: **Settings → Source → Root Directory**
+4. Cole o path correto (abaixo) e salve
+5. Faça **Redeploy** do service
+
 ### Serviços recomendados
 
 Crie **3 services** no Railway (pode ser no mesmo Project):
@@ -33,6 +51,14 @@ Como é monorepo, em cada Service do Railway configure o **Root Directory**:
 - `projeto-Luna.code-workspace/LunaCore/lunacore`
 - `projeto-Luna.code-workspace/LunaTotem/TotemAPI`
 - `projeto-Luna.code-workspace/LunaPay/lunapay-api`
+
+Checklist rápido se der erro de build:
+
+- Se aparecer `Detected Node` / `No start command was found` → o **Root Directory está errado/vazio**.
+- Se o Railway não detectar Java/Docker mesmo com Root Directory correto:
+  - confira se o path existe exatamente (sem espaços a mais)
+  - confirme que dentro da pasta há `pom.xml` e/ou `Dockerfile`
+  - redeploy após salvar o Root Directory
 
 Se o Railway detectar Dockerfile, ok; caso use buildpack, também funciona, mas Docker tende a ser mais previsível.
 
@@ -87,8 +113,10 @@ Configure em **Production** (e Preview se precisar):
 
 - `NEXT_PUBLIC_LUNATOTEM_API_URL=/`
 - `TOTEM_API_PROXY_URL=https://<dominio-do-totemapi-no-railway>`
+- `LUNACORE_PROXY_URL=https://<dominio-do-lunacore-no-railway>`
 
 > Dica: deixe `TOTEM_API_PROXY_URL` **sem barra no final**.
+> Dica: deixe `LUNACORE_PROXY_URL` **sem barra no final**.
 
 ### Como validar
 

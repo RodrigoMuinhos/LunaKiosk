@@ -17,7 +17,20 @@ const nextConfig = {
         // IMPORTANT: keep this as fallback so local Next routes (e.g. /api/health) still work.
         // In docker-compose, TotemAPI is reachable by service name `totemapi:8081`.
         const totemApiTarget = process.env.TOTEM_API_PROXY_URL || 'http://totemapi:8081';
+        // Auth lives in LunaCore (not TotemAPI). In docker-compose, LunaCore is reachable by service name `lunacore:8080`.
+        // In Vercel, set LUNACORE_PROXY_URL to the public Railway URL of LunaCore.
+        const lunaCoreTarget =
+            process.env.LUNACORE_PROXY_URL ||
+            process.env.CORE_API_PROXY_URL ||
+            'http://lunacore:8080';
         return {
+            // Ensure auth calls go to LunaCore; everything else under /api goes to TotemAPI.
+            beforeFiles: [
+                {
+                    source: '/api/auth/:path*',
+                    destination: `${lunaCoreTarget}/api/auth/:path*`,
+                },
+            ],
             fallback: [
                 {
                     source: '/api/:path*',
