@@ -117,6 +117,7 @@ Configure em **Production** (e Preview se precisar):
 
 > Dica: deixe `TOTEM_API_PROXY_URL` **sem barra no final**.
 > Dica: deixe `LUNACORE_PROXY_URL` **sem barra no final**.
+> Importante: use **https://** (ou pelo menos o hostname; o código tenta normalizar, mas `https://` é o mais seguro).
 
 ### Como validar
 
