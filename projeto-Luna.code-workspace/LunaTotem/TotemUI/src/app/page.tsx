@@ -93,7 +93,7 @@ export default function Page() {
     const inactivityTimer = useRef<number | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const restVideoRef = useRef<HTMLVideoElement | null>(null);
-    const INACTIVITY_MS = 5 * 60 * 1000; // 5 minutos (vídeo descanso após 5 min)
+    const [inactivityMs, setInactivityMs] = useState(5 * 60 * 1000); // default: 5 min
 
     const [primaryVideoSrc, setPrimaryVideoSrc] = useState<string | null>(null);
 
@@ -184,6 +184,27 @@ export default function Page() {
         };
     }, []);
 
+    // Carrega configuração de inatividade (1..5 min)
+    useEffect(() => {
+        let cancelled = false;
+        const loadSettings = async () => {
+            try {
+                const res = await fetch('/api/videos/settings');
+                const data = await res.json();
+                if (cancelled) return;
+                const mins = Number.parseInt(String(data?.settings?.inactivityMinutes ?? ''), 10);
+                const clamped = Number.isFinite(mins) ? Math.max(1, Math.min(5, mins)) : 5;
+                setInactivityMs(clamped * 60 * 1000);
+            } catch {
+                if (!cancelled) setInactivityMs(5 * 60 * 1000);
+            }
+        };
+        loadSettings();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     // Carrega vídeos ativos para usar no modo descanso e overlay manual
     useEffect(() => {
         let cancelled = false;
@@ -212,7 +233,7 @@ export default function Page() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [isRestMode]);
 
     // Inatividade: volta para modo descanso após 5 min sem interação
     useEffect(() => {
@@ -223,7 +244,7 @@ export default function Page() {
             inactivityTimer.current = window.setTimeout(() => {
                 setIsRestMode(true);
                 resetFlow();
-            }, INACTIVITY_MS);
+            }, inactivityMs);
         };
 
         const handleActivity = () => {
@@ -241,7 +262,7 @@ export default function Page() {
                 window.clearTimeout(inactivityTimer.current);
             }
         };
-    }, [isRestMode]);
+    }, [isRestMode, inactivityMs]);
 
     useEffect(() => {
         const videoElement = videoRef.current;

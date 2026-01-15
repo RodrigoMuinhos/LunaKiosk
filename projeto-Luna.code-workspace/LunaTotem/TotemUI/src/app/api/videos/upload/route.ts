@@ -11,9 +11,22 @@ import {
   VideoRecord,
   writeVideos,
 } from '../videoStore';
+import { readVideoSettings } from '../settingsStore';
 
 export async function POST(request: Request) {
   try {
+    const settings = await readVideoSettings();
+    if (settings.source === 'folder') {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Upload desabilitado: o Totem está configurado para usar vídeos de uma pasta local.',
+        },
+        { status: 409 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('file');
     const title = String(formData.get('title') ?? '').trim();

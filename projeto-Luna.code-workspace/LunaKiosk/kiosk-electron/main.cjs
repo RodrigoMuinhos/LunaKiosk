@@ -975,7 +975,9 @@ async function startTotemUiStandaloneServer() {
     HOSTNAME: KIOSK_HOST,
     NODE_ENV: 'production',
     ELECTRON_RUN_AS_NODE: '1',
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || `http://localhost:${backendPorts.lunacore}`
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || `http://localhost:${backendPorts.lunacore}`,
+    // Where TotemUI can persist JSON settings (videos.json, video-settings.json) safely.
+    KIOSK_DATA_DIR: process.env.KIOSK_DATA_DIR || path.join(app.getPath('userData'), 'data')
   };
 
   const healthUrl = `http://${KIOSK_HOST}:${kioskPortRuntime}/api/health`;

@@ -2,7 +2,11 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+// In the Electron kiosk (packaged), process.cwd() can point to a read-only directory.
+// Allow overriding where we persist JSON data.
+const DATA_DIR = process.env.KIOSK_DATA_DIR
+  ? path.resolve(process.env.KIOSK_DATA_DIR)
+  : path.join(process.cwd(), 'data');
 const DATA_FILE = path.join(DATA_DIR, 'videos.json');
 
 export type VideoStatus = 'PENDING' | 'PROCESSING' | 'ACTIVE' | 'ARCHIVED' | 'ERROR';

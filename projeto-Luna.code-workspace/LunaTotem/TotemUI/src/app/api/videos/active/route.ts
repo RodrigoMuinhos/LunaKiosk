@@ -2,10 +2,63 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import path from 'path';
+import { promises as fs } from 'fs';
 import { readVideos, sanitizeVideo } from '../videoStore';
+import { readVideoSettings } from '../settingsStore';
+
+const ALLOWED_EXTS = new Set(['.mp4', '.mov', '.avi', '.webm', '.mkv']);
+
+async function listFolderVideos(folderPath: string) {
+  const entries = await fs.readdir(folderPath, { withFileTypes: true });
+  const files = entries
+    .filter((e) => e.isFile())
+    .map((e) => e.name)
+    .filter((name) => ALLOWED_EXTS.has(path.extname(name).toLowerCase()));
+
+  files.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+  const limited = files.slice(0, 15);
+  const stats = await Promise.all(
+    limited.map(async (name) => {
+      const fullPath = path.join(folderPath, name);
+      try {
+        const stat = await fs.stat(fullPath);
+        return { name, stat };
+      } catch {
+        return { name, stat: null as any };
+      }
+    })
+  );
+
+  return stats
+    .filter((x) => x.stat && x.stat.isFile())
+    .map((x, idx) => {
+      const ext = path.extname(x.name);
+      const title = x.name.replace(new RegExp(`${ext}$`, 'i'), '');
+      return {
+        id: `local:${x.name}`,
+        filename: x.name,
+        title,
+        description: '',
+        displayOrder: idx + 1,
+        fileSize: x.stat.size,
+        isActive: true,
+        status: 'ACTIVE',
+        createdAt: new Date(x.stat.mtimeMs).toISOString(),
+        filePath: `/api/videos/local/${encodeURIComponent(x.name)}`,
+      };
+    });
+}
 
 export async function GET() {
   try {
+    const settings = await readVideoSettings();
+    if (settings.source === 'folder' && settings.folderPath) {
+      const videos = await listFolderVideos(settings.folderPath);
+      return NextResponse.json({ success: true, videos });
+    }
+
     const videos = await readVideos();
     const activeVideos = videos
       .filter((video) => video.isActive || video.status === 'ACTIVE')

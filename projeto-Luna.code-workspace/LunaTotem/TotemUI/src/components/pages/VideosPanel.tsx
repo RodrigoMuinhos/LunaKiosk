@@ -25,6 +25,7 @@ interface VideoItem {
   isActive: boolean;
   status: 'PENDING' | 'PROCESSING' | 'ACTIVE' | 'ARCHIVED' | 'ERROR';
   createdAt: string;
+  filePath?: string;
 }
 
 const STATUS_COLORS: Record<VideoItem['status'], string> = {
@@ -48,6 +49,9 @@ export function VideosPanel() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadMeta, setUploadMeta] = useState({ title: '', description: '' });
   const [inactivityTimeout, setInactivityTimeout] = useState<number>(3);
+  const [videoSource, setVideoSource] = useState<'uploads' | 'folder'>('uploads');
+  const [folderPath, setFolderPath] = useState<string>('');
+  const [savingSettings, setSavingSettings] = useState(false);
   const [editingVideo, setEditingVideo] = useState<VideoItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -135,9 +139,50 @@ export function VideosPanel() {
     }
   };
 
+  const loadSettings = async () => {
+    try {
+      const response = await apiRequest('GET', getLocalApiUrl('/api/videos/settings'));
+      if (response.success && response.settings) {
+        const src = response.settings.source === 'folder' ? 'folder' : 'uploads';
+        setVideoSource(src);
+        setFolderPath(String(response.settings.folderPath || ''));
+
+        const mins = Number.parseInt(String(response.settings.inactivityMinutes ?? 3), 10);
+        const clamped = Number.isFinite(mins) ? Math.max(1, Math.min(5, mins)) : 3;
+        setInactivityTimeout(clamped);
+      }
+    } catch (error) {
+      console.warn('Falha ao carregar settings de vídeo', error);
+    }
+  };
+
   useEffect(() => {
+    loadSettings();
     loadVideos();
   }, []);
+
+  const saveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const response = await apiRequest('PUT', getLocalApiUrl('/api/videos/settings'), {
+        source: videoSource,
+        folderPath: folderPath,
+        inactivityMinutes: inactivityTimeout,
+      });
+
+      if (response.success) {
+        window.alert('Configurações salvas.');
+        loadSettings();
+        loadVideos();
+      } else {
+        window.alert(`Erro ao salvar configurações: ${resolveMessage(response)}`);
+      }
+    } catch (error) {
+      window.alert(`Erro ao salvar configurações: ${(error as Error)?.message || 'Desconhecido'}`);
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   const applyFileSelection = (file: File) => {
     setSelectedFile(file);
@@ -164,6 +209,10 @@ export function VideosPanel() {
 
   const handleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (videoSource === 'folder') {
+      window.alert('Upload desabilitado: o Totem está usando vídeos de uma pasta local.');
+      return;
+    }
     if (!selectedFile) {
       window.alert('Selecione um arquivo de video.');
       return;
@@ -344,6 +393,68 @@ export function VideosPanel() {
           <div className="text-xs text-[#A38C77]">Arraste o arquivo ou selecione pelo explorador.</div>
         </div>
 
+        <div className="mt-5 rounded-[28px] border border-[#E9DAD1] bg-[#FFFCF8] p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[#7B6A5A]">Fonte dos vídeos do descanso</p>
+              <p className="text-xs text-[#A38C77]">
+                No LunaKiosk local você pode apontar para uma pasta do PC. Em hospedagens (ex: Vercel) isso não funciona.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setVideoSource('uploads')}
+                className={`rounded-full px-4 py-2 text-sm font-semibold border transition ${
+                  videoSource === 'uploads'
+                    ? 'bg-[#D3A67F] text-white border-[#D3A67F]'
+                    : 'bg-white text-[#8C7155] border-[#CFB6A1] hover:bg-[#F8F1EA]'
+                }`}
+              >
+                Upload
+              </button>
+              <button
+                type="button"
+                onClick={() => setVideoSource('folder')}
+                className={`rounded-full px-4 py-2 text-sm font-semibold border transition ${
+                  videoSource === 'folder'
+                    ? 'bg-[#D3A67F] text-white border-[#D3A67F]'
+                    : 'bg-white text-[#8C7155] border-[#CFB6A1] hover:bg-[#F8F1EA]'
+                }`}
+              >
+                Pasta local
+              </button>
+            </div>
+          </div>
+
+          {videoSource === 'folder' && (
+            <div className="mt-4 space-y-2">
+              <label className="text-sm font-semibold text-[#7B6A5A]">Caminho da pasta (ex: C:\\Videos\\Luna)</label>
+              <input
+                type="text"
+                value={folderPath}
+                onChange={(e) => setFolderPath(e.target.value)}
+                placeholder="C:\\LunaKiosk\\videos"
+                className={inputClass}
+              />
+              <p className="text-xs text-[#B09985]">
+                O totem vai listar automaticamente os arquivos de vídeo dessa pasta (MP4/MOV/AVI/WEBM/MKV).
+              </p>
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <Button
+              type="button"
+              onClick={saveSettings}
+              disabled={savingSettings}
+              className="flex-1 rounded-2xl bg-[#8C7155] text-white hover:bg-[#7C6248]"
+            >
+              {savingSettings ? 'Salvando...' : 'Salvar configurações'}
+            </Button>
+          </div>
+        </div>
+
         <form onSubmit={handleUpload} className="mt-6 space-y-5">
           <div
             onDragEnter={handleDrag}
@@ -436,10 +547,14 @@ export function VideosPanel() {
 
           <Button
             type="submit"
-            disabled={!selectedFile || uploading}
-            className="w-full rounded-2xl bg-[#D3A67F] text-white text-lg font-semibold hover:bg-[#C38F64]"
+            disabled={videoSource === 'folder' || !selectedFile || uploading}
+            className="w-full rounded-2xl bg-[#D3A67F] text-white text-lg font-semibold hover:bg-[#C38F64] disabled:opacity-50"
           >
-            {uploading ? 'Enviando...' : 'Adicionar a galeria'}
+            {videoSource === 'folder'
+              ? 'Upload desabilitado (pasta local ativa)'
+              : uploading
+                ? 'Enviando...'
+                : 'Adicionar a galeria'}
           </Button>
         </form>
       </section>
