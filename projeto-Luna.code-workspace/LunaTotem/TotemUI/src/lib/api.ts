@@ -260,6 +260,12 @@ export const appointmentAPI = {
       body: JSON.stringify({ status }),
     }),
 
+  updatePaid: (id: string, paid: boolean) =>
+    fetchAPI<Appointment>(API_ENDPOINTS.appointmentPaid(id), {
+      method: 'PUT',
+      body: JSON.stringify({ paid }),
+    }),
+
   notify: async (id: string, payload: { patientEmail?: string; doctorEmail?: string }) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout

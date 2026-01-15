@@ -46,6 +46,7 @@ export function Dashboard({ refreshCallbackRef }: DashboardProps) {
     isValidRole(normalizedAuthRole) ? (normalizedAuthRole as Role) : null
   );
   const [updatingAppointmentId, setUpdatingAppointmentId] = useState<string | null>(null);
+  const [updatingPaidId, setUpdatingPaidId] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -231,13 +232,51 @@ export function Dashboard({ refreshCallbackRef }: DashboardProps) {
 
   const getStatusColor = (status: string) => getStatusBadgeClasses(status);
 
-  const renderPaidBadge = (paid: any) => {
+  const renderPaidBadge = (paid: any, appointmentId?: string) => {
     const isPaid = Boolean(paid);
     const label = isPaid ? 'Pago' : 'Não pago';
     const classes = isPaid
       ? 'bg-green-100 text-green-800 border border-green-200'
       : 'bg-amber-100 text-amber-800 border border-amber-200';
-    return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${classes}`}>{label}</span>;
+
+    if (!appointmentId || userRole !== 'ADMINISTRACAO') {
+      return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${classes}`}>{label}</span>;
+    }
+
+    return (
+      <button
+        onClick={() => handlePaidToggle(appointmentId, isPaid)}
+        disabled={updatingPaidId === appointmentId}
+        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer hover:scale-105 hover:shadow-md transition-all disabled:opacity-50 ${classes}`}
+        title="Clique para alternar pago/não pago"
+      >
+        {updatingPaidId === appointmentId ? '...' : label}
+      </button>
+    );
+  };
+
+  const handlePaidToggle = async (appointmentId: string, currentlyPaid: boolean) => {
+    const nextPaid = !currentlyPaid;
+    setUpdatingPaidId(appointmentId);
+    try {
+      await appointmentAPI.updatePaid(appointmentId, nextPaid);
+      setSummary((prev) =>
+        prev
+          ? {
+              ...prev,
+              recentAppointments: prev.recentAppointments.map((apt) =>
+                apt.id === appointmentId ? { ...apt, paid: nextPaid } : apt
+              ),
+            }
+          : null
+      );
+      toast.success(nextPaid ? 'Marcado como pago' : 'Marcado como não pago');
+    } catch (error) {
+      console.error('Erro ao atualizar pagamento:', error);
+      toast.error('Erro ao atualizar pagamento');
+    } finally {
+      setUpdatingPaidId(null);
+    }
   };
 
   const handleStatusChange = async (appointmentId: string, currentStatus: string) => {
@@ -346,7 +385,7 @@ export function Dashboard({ refreshCallbackRef }: DashboardProps) {
                 { key: 'doctor', header: 'Médico', cell: (a) => <span className="text-gray-600">{a.doctor}</span> },
                 { key: 'date', header: 'Data', cell: (a) => <span className="text-gray-600">{formatDate(a.date)}</span> },
                 { key: 'time', header: 'Horário', cell: (a) => <span className="text-gray-600">{a.time}</span> },
-                { key: 'paid', header: 'Pagamento', cell: (a) => renderPaidBadge((a as any).paid) },
+                { key: 'paid', header: 'Pagamento', cell: (a) => renderPaidBadge((a as any).paid, a.id) },
                 { key: 'status', header: 'Status', cell: (a) => (
                   <button
                     onClick={() => handleStatusChange(a.id, a.status)}
@@ -363,7 +402,7 @@ export function Dashboard({ refreshCallbackRef }: DashboardProps) {
                   <div>
                     <div className="text-sm font-medium text-gray-800">{appointment.patient}</div>
                     <div className="text-xs text-gray-500">{appointment.doctor}</div>
-                    <div className="mt-2">{renderPaidBadge((appointment as any).paid)}</div>
+                    <div className="mt-2">{renderPaidBadge((appointment as any).paid, appointment.id)}</div>
                   </div>
                   <div className="text-xs text-gray-500 text-right">
                     <div>{formatDate(appointment.date)}</div>

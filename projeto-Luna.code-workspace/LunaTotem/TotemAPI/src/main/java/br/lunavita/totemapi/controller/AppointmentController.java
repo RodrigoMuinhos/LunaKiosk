@@ -1,23 +1,33 @@
 package br.lunavita.totemapi.controller;
 
-import br.lunavita.totemapi.dto.AppointmentNotificationRequest;
-import br.lunavita.totemapi.model.Appointment;
-import br.lunavita.totemapi.model.AppointmentRequest;
-import br.lunavita.totemapi.model.AppointmentStatusUpdate;
-import br.lunavita.totemapi.security.UserContext;
-import br.lunavita.totemapi.service.DataStoreService;
-import br.lunavita.totemapi.service.ReportService;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
+import br.lunavita.totemapi.dto.AppointmentNotificationRequest;
+import br.lunavita.totemapi.model.Appointment;
+import br.lunavita.totemapi.model.AppointmentPaidUpdate;
+import br.lunavita.totemapi.model.AppointmentRequest;
+import br.lunavita.totemapi.model.AppointmentStatusUpdate;
+import br.lunavita.totemapi.security.UserContext;
+import br.lunavita.totemapi.service.DataStoreService;
+import br.lunavita.totemapi.service.ReportService;
 
 @RestController
 @RequestMapping("/api/appointments")
@@ -110,6 +120,29 @@ public class AppointmentController {
                     .orElseGet(() -> ResponseEntity.notFound().build());
         }
         return store.updateStatus(id, update.getStatus())
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}/paid")
+    public ResponseEntity<Appointment> updatePaid(
+            @PathVariable String id,
+            @RequestBody AppointmentPaidUpdate update,
+            @AuthenticationPrincipal UserContext userContext) {
+
+        if (update == null || update.getPaid() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Field 'paid' is required");
+        }
+
+        boolean paid = update.getPaid();
+
+        if (userContext != null && userContext.getTenantId() != null && !userContext.getTenantId().isBlank()) {
+            return store.updatePaid(id, paid, userContext.getTenantId())
+                    .map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        }
+
+        return store.updatePaid(id, paid)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

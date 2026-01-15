@@ -1,31 +1,33 @@
 package br.lunavita.totemapi.service;
 
-import br.lunavita.totemapi.model.Appointment;
-import br.lunavita.totemapi.model.AppointmentRequest;
-import br.lunavita.totemapi.model.Doctor;
-import br.lunavita.totemapi.model.DashboardSummary;
-import br.lunavita.totemapi.repository.AppointmentRepository;
-import br.lunavita.totemapi.repository.DoctorRepository;
-import br.lunavita.totemapi.repository.PatientRepository;
-import br.lunavita.totemapi.model.Patient;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import br.lunavita.totemapi.model.Appointment;
+import br.lunavita.totemapi.model.AppointmentRequest;
+import br.lunavita.totemapi.model.DashboardSummary;
+import br.lunavita.totemapi.model.Doctor;
+import br.lunavita.totemapi.model.Patient;
+import br.lunavita.totemapi.repository.AppointmentRepository;
+import br.lunavita.totemapi.repository.DoctorRepository;
+import br.lunavita.totemapi.repository.PatientRepository;
 import jakarta.transaction.Transactional;
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.stream.Collectors;
-import java.time.Instant;
 
 @Service
 public class DataStoreService {
@@ -142,9 +144,6 @@ public class DataStoreService {
         return appointmentRepository.findById(id)
                 .map(apt -> {
                     apt.setStatus(status);
-                    if ("confirmado".equalsIgnoreCase(status)) {
-                        apt.setPaid(true);
-                    }
                     return appointmentRepository.save(apt);
                 });
     }
@@ -157,9 +156,27 @@ public class DataStoreService {
         return appointmentRepository.findByTenantIdAndId(tenantId, id)
                 .map(apt -> {
                     apt.setStatus(status);
-                    if ("confirmado".equalsIgnoreCase(status)) {
-                        apt.setPaid(true);
-                    }
+                    return appointmentRepository.save(apt);
+                });
+    }
+
+    @Transactional
+    public Optional<Appointment> updatePaid(String id, boolean paid) {
+        return appointmentRepository.findById(id)
+                .map(apt -> {
+                    apt.setPaid(paid);
+                    return appointmentRepository.save(apt);
+                });
+    }
+
+    @Transactional
+    public Optional<Appointment> updatePaid(String id, boolean paid, String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            return updatePaid(id, paid);
+        }
+        return appointmentRepository.findByTenantIdAndId(tenantId, id)
+                .map(apt -> {
+                    apt.setPaid(paid);
                     return appointmentRepository.save(apt);
                 });
     }

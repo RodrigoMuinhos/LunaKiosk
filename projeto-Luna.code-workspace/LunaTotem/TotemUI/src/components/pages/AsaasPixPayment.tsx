@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { PageContainer } from '../PageContainer';
 import { FlowType, getFlowSteps } from '@/lib/flowSteps';
-import { paymentAPI } from '@/lib/api';
+import { appointmentAPI, paymentAPI } from '@/lib/api';
 
 const createInFlightByAppointment = new Set<string>();
 const RETRY_DELAYS_MS = [800, 1500];
@@ -201,6 +201,13 @@ export function AsaasPixPayment({ appointmentId, onComplete, onBack, flow = 'pay
 
       if (isPaid) {
         clearPolling();
+        try {
+          // Atualiza o agendamento para refletir o pagamento confirmado (sem depender do dashboard/polling).
+          await appointmentAPI.updatePaid(appointmentId, true);
+        } catch (e) {
+          // best-effort: não bloqueia o fluxo se o backend falhar temporariamente
+          console.warn('Falha ao marcar pagamento como pago no agendamento', e);
+        }
         onComplete();
       }
     } catch (err) {

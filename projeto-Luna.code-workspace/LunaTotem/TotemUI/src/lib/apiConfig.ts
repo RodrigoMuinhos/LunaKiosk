@@ -36,6 +36,7 @@ export const API_ENDPOINTS = {
   appointments: `${API_BASE_URL}/api/appointments`,
   appointmentById: (id: string) => `${API_BASE_URL}/api/appointments/${id}`,
   appointmentStatus: (id: string) => `${API_BASE_URL}/api/appointments/${id}/status`,
+  appointmentPaid: (id: string) => `${API_BASE_URL}/api/appointments/${id}/paid`,
   appointmentPhoto: (id: string) => `${API_BASE_URL}/api/appointments/${id}/photo`,
   appointmentReport: (id: string) => `${API_BASE_URL}/api/appointments/${id}/report`,
   appointmentNotify: (id: string) => `${API_BASE_URL}/api/appointments/${id}/notify`,
