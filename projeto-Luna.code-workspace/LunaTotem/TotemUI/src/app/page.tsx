@@ -45,15 +45,21 @@ const normalizeBoolean = (value: unknown): boolean => {
 const buildAppointments = (apiAppointments: ApiAppointment[], patients: ApiPatient[]): UIAppointment[] => {
     const patientMap = new Map<string, ApiPatient>();
     patients.forEach((patient) => {
-        if (patient.id) {
-            patientMap.set(patient.id, patient);
+        if (patient.id !== null && patient.id !== undefined && String(patient.id).trim() !== '') {
+            const key = String(patient.id);
+            // Keep a normalized id to avoid Map key mismatches (e.g., numeric id 28 vs string "28")
+            patientMap.set(key, { ...patient, id: key } as ApiPatient);
         }
     });
 
     return apiAppointments.map((apiAppointment) => {
-        const patientFromMap = apiAppointment.patientId ? patientMap.get(apiAppointment.patientId) : undefined;
+        const patientIdKey =
+            (apiAppointment as any).patientId !== null && (apiAppointment as any).patientId !== undefined
+                ? String((apiAppointment as any).patientId)
+                : '';
+        const patientFromMap = patientIdKey ? patientMap.get(patientIdKey) : undefined;
         const patient = {
-            id: patientFromMap?.id ?? apiAppointment.patientId ?? '',
+            id: patientFromMap?.id ?? patientIdKey,
             name: patientFromMap?.name ?? apiAppointment.patient ?? 'Paciente',
             cpf: patientFromMap?.cpf ?? apiAppointment.cpf,
             phone: patientFromMap?.phone ?? '',
@@ -65,7 +71,7 @@ const buildAppointments = (apiAppointments: ApiAppointment[], patients: ApiPatie
 
         return {
             id: apiAppointment.id ?? '',
-            patientId: apiAppointment.patientId,
+            patientId: patientIdKey,
             patient,
             doctor: apiAppointment.doctor,
             specialty: apiAppointment.specialty,
