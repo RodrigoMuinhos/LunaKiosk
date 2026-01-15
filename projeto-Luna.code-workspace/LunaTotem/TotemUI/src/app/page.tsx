@@ -27,6 +27,21 @@ import {
 } from '../lib/api';
 import { API_BASE_URL } from '../lib/apiConfig';
 
+const normalizeBoolean = (value: unknown): boolean => {
+    if (value === true || value === false) return value;
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'number') return value !== 0;
+    if (typeof value === 'string') {
+        const v = value.trim().toLowerCase();
+        if (v === '') return false;
+        if (['true', '1', 'yes', 'y', 'sim', 's'].includes(v)) return true;
+        if (['false', '0', 'no', 'n', 'nao', 'não'].includes(v)) return false;
+        // Fallback: any other non-empty string counts as true
+        return true;
+    }
+    return Boolean(value);
+};
+
 const buildAppointments = (apiAppointments: ApiAppointment[], patients: ApiPatient[]): UIAppointment[] => {
     const patientMap = new Map<string, ApiPatient>();
     patients.forEach((patient) => {
@@ -46,6 +61,7 @@ const buildAppointments = (apiAppointments: ApiAppointment[], patients: ApiPatie
 
         const rawAmount = apiAppointment.amount;
         const amount = typeof rawAmount === 'string' ? Number(rawAmount) : rawAmount;
+        const paid = normalizeBoolean((apiAppointment as any).paid);
 
         return {
             id: apiAppointment.id ?? '',
@@ -56,7 +72,7 @@ const buildAppointments = (apiAppointments: ApiAppointment[], patients: ApiPatie
             date: apiAppointment.date,
             time: apiAppointment.time,
             status: apiAppointment.status,
-            paid: apiAppointment.paid,
+            paid,
             amount: Number.isNaN(amount) ? 0 : amount,
             cpf: apiAppointment.cpf,
         };
