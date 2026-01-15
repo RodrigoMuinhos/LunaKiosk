@@ -52,14 +52,18 @@ public class SeedService {
         return String.format("(11) 9%04d-%04d", (int) (Math.random() * 9999), (int) (Math.random() * 9999));
     }
 
-    public void seedPatientsAndDoctors() {
-        if (patientRepository.count() > 0)
+    public void seedPatientsAndDoctors(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new IllegalArgumentException("tenantId is required for seeding");
+        }
+        if (patientRepository.countByTenantId(tenantId) > 0)
             return;
 
         seedPatients = new ArrayList<>();
         for (int i = 0; i < 50; i++) {
             Patient p = new Patient();
             p.setId(UUID.randomUUID().toString());
+            p.setTenantId(tenantId);
             p.setName(randomName());
             p.setCpf(generateCPF());
             p.setPhone(generatePhone());
@@ -72,6 +76,7 @@ public class SeedService {
         for (String spec : SPECIALTIES) {
             Doctor d = new Doctor();
             d.setId(UUID.randomUUID().toString());
+            d.setTenantId(tenantId);
             d.setName("Dr. " + randomName());
             d.setCrm("CRM/" + (10000 + (int) (Math.random() * 90000)));
             d.setSpecialty(spec);
@@ -82,9 +87,9 @@ public class SeedService {
         }
     }
 
-    public void seedPaymentsForDate(LocalDate date, int count) {
+    public void seedPaymentsForDate(LocalDate date, int count, String tenantId) {
         if (seedPatients == null || seedPatients.isEmpty()) {
-            seedPatientsAndDoctors();
+            seedPatientsAndDoctors(tenantId);
         }
 
         for (int i = 0; i < count; i++) {
@@ -94,6 +99,7 @@ public class SeedService {
             Appointment appt = new Appointment();
             String apptId = UUID.randomUUID().toString();
             appt.setId(apptId);
+            appt.setTenantId(tenantId);
             appt.setPatientId(patient.getId());
             appt.setPatient(patient.getName());
             appt.setCpf(patient.getCpf());

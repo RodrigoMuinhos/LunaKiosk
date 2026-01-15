@@ -1,11 +1,12 @@
 package br.lunavita.totemapi.repository;
 
-import br.lunavita.totemapi.model.Doctor;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.Optional;
+import br.lunavita.totemapi.model.Doctor;
 
 @Repository
 public interface DoctorRepository extends JpaRepository<Doctor, String> {
@@ -21,6 +22,11 @@ public interface DoctorRepository extends JpaRepository<Doctor, String> {
      * Lista todos os médicos do tenant
      */
     List<Doctor> findAllByTenantId(String tenantId);
+
+    /**
+     * Conta médicos por tenant (útil para seed/test)
+     */
+    long countByTenantId(String tenantId);
 
     /**
      * Busca médico por nome dentro do tenant
