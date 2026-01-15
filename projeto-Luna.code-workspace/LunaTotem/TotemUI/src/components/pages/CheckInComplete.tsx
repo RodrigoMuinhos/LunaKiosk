@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../Button';
 import { PageContainer } from '../PageContainer';
 import { Appointment } from '../../types';
@@ -11,12 +11,70 @@ interface CheckInCompleteProps {
 }
 
 export function CheckInComplete({ appointment, onFinish, onPayNow }: CheckInCompleteProps) {
+  const timersRef = useRef<{ timeout?: ReturnType<typeof setTimeout>; interval?: ReturnType<typeof setInterval> }>({});
+
+  const totalSeconds = useMemo(() => {
+    const raw = process.env.NEXT_PUBLIC_CHECKIN_COMPLETE_SECONDS;
+    const parsed = raw ? Number.parseInt(String(raw), 10) : NaN;
+    const effective = Number.isFinite(parsed) && parsed > 0 ? parsed : 120; // default 2 minutes
+    // clamp 10s .. 10min
+    return Math.min(600, Math.max(10, effective));
+  }, []);
+
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(totalSeconds);
+
+  const clearTimers = () => {
+    if (timersRef.current.timeout) {
+      clearTimeout(timersRef.current.timeout);
+      timersRef.current.timeout = undefined;
+    }
+    if (timersRef.current.interval) {
+      clearInterval(timersRef.current.interval);
+      timersRef.current.interval = undefined;
+    }
+  };
+
   useEffect(() => {
-    const timer = setTimeout(() => {
+    clearTimers();
+    setTimeLeftSeconds(totalSeconds);
+
+    const startAt = Date.now();
+    const totalMs = totalSeconds * 1000;
+
+    const tick = () => {
+      const elapsed = Date.now() - startAt;
+      const remaining = Math.max(0, totalMs - elapsed);
+      const remainingSeconds = Math.ceil(remaining / 1000);
+      setTimeLeftSeconds(remainingSeconds);
+      if (remaining <= 0) {
+        clearTimers();
+        onFinish();
+      }
+    };
+
+    timersRef.current.interval = setInterval(tick, 250);
+    timersRef.current.timeout = setTimeout(() => {
+      clearTimers();
       onFinish();
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [onFinish]);
+    }, totalMs);
+    tick();
+
+    return () => {
+      clearTimers();
+    };
+  }, [onFinish, totalSeconds]);
+
+  const formatTimeLeft = (seconds: number) => {
+    const safe = Math.max(0, Math.floor(seconds));
+    const mm = Math.floor(safe / 60);
+    const ss = safe % 60;
+    return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  };
+
+  const handlePayNow = () => {
+    clearTimers();
+    onPayNow?.();
+  };
 
   return (
     <PageContainer
@@ -90,12 +148,12 @@ export function CheckInComplete({ appointment, onFinish, onPayNow }: CheckInComp
             Aguarde ser chamada na recepção
           </p>
           <p className="text-sm text-[#4A4A4A]/50">
-            Retornando ao menu inicial em instantes...
+            Retornando ao menu inicial em {formatTimeLeft(timeLeftSeconds)}...
           </p>
           {onPayNow && (
             <div className="flex flex-col items-center gap-3">
               <p className="text-sm text-[#4A4A4A]/70">Deseja pagar agora?</p>
-              <Button variant="secondary" size="xl" onClick={onPayNow}>
+              <Button variant="secondary" size="xl" onClick={handlePayNow}>
                 Ir para Pagamento
               </Button>
             </div>

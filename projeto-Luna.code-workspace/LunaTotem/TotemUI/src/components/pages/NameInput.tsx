@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { maskCPF, maskCPFWithHiddenCenter, stripCPF } from '@/lib/cpf';
-import { getFlowSteps } from '@/lib/flowSteps';
+import { FlowType, getFlowSteps } from '@/lib/flowSteps';
 import { Button } from '../Button';
 import { PageContainer } from '../PageContainer';
 import { ActionFooter } from '../ActionFooter';
@@ -9,13 +9,19 @@ import type { Appointment } from '../../types';
 interface NameInputProps {
   onSubmit: (cpf: string) => void;
   onBack: () => void;
+  flow?: FlowType;
   appointments?: Appointment[];
   onSelectAppointment?: (apt: Appointment) => void;
   onHelpClick?: () => void;
 }
 
-export function NameInput({ onSubmit, onBack, appointments = [], onSelectAppointment, onHelpClick }: NameInputProps) {
+export function NameInput({ onSubmit, onBack, flow = 'checkin', appointments = [], onSelectAppointment, onHelpClick }: NameInputProps) {
   const [cpf, setCpf] = useState('');
+
+  const subtitle =
+    flow === 'payment'
+      ? 'Use seu CPF para localizar seu pagamento'
+      : 'Use seu CPF para localizar seu agendamento';
 
   const handleSubmit = () => {
     onSubmit(stripCPF(cpf));
@@ -51,13 +57,13 @@ export function NameInput({ onSubmit, onBack, appointments = [], onSelectAppoint
   return (
     <PageContainer
       onHelpClick={onHelpClick}
-      steps={getFlowSteps('checkin')}
+      steps={getFlowSteps(flow)}
       currentStep={0}
     >
       <div className="w-full flex flex-col items-center gap-8">
         <div className="text-center space-y-3">
           <h2 className="text-3xl md:text-4xl text-[#D3A67F]">Digite seu CPF</h2>
-          <p className="text-lg text-[#4A4A4A]/70">Use seu CPF para localizar seu agendamento</p>
+          <p className="text-lg text-[#4A4A4A]/70">{subtitle}</p>
         </div>
 
         <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6">

@@ -75,6 +75,7 @@ type Screen =
     | 'patientConfirmation'
     | 'photoCapture'
     | 'checkInComplete'
+    | 'paymentCpfInput'
     | 'paymentLetterSelection'
     | 'paymentPatientList'
     | 'paymentPhoneInput'
@@ -360,6 +361,16 @@ export default function Page() {
         setCurrentScreen('letterSelection');
     };
 
+    const handleStartPayment = () => {
+        setSelectedLetter('');
+        setFilteredAppointments([]);
+        setSelectedAppointment(null);
+        setPaymentMethod(null);
+        setInstallments(1);
+        setPaymentDecisionMode('payment');
+        setCurrentScreen('paymentCpfInput');
+    };
+
     const handleSelectLetterCheckIn = (letter: string) => {
         setSelectedLetter(letter);
         const appointmentsByLetter = filterAppointmentsByLetter(letter)
@@ -396,9 +407,24 @@ export default function Page() {
         setCurrentScreen('patientList');
     };
 
+    const handleCpfSubmitPayment = async (cpfValue: string) => {
+        const refreshed = await refreshAppointmentsForSearch();
+        const source = refreshed && refreshed.length ? refreshed : appointments;
+        const unpaid = filterAppointmentsByCpf(cpfValue, source).filter((appointment) => !appointment.paid);
+        setFilteredAppointments(unpaid);
+        setCurrentScreen('paymentPatientList');
+    };
+
     const handleSelectSuggestion = (apt: UIAppointment) => {
         setSelectedAppointment(apt);
         setCurrentScreen('patientConfirmation');
+    };
+
+    const handleSelectSuggestionPayment = (apt: UIAppointment) => {
+        setSelectedAppointment(apt);
+        setPaymentMethod(null);
+        setPaymentDecisionMode('payment');
+        setCurrentScreen('paymentDecision');
     };
 
     const handleConfirmPatient = async () => {
@@ -590,7 +616,7 @@ export default function Page() {
     const renderScreen = () => {
         switch (currentScreen) {
             case 'home':
-                return <Home onCheckIn={handleStartCheckIn} onHelpClick={handleHelpClick} />;
+                return <Home onCheckIn={handleStartCheckIn} onPayment={handleStartPayment} onHelpClick={handleHelpClick} />;
 
             case 'letterSelection':
                 return <LetterSelection flow="checkin" onSelectLetter={handleSelectLetterCheckIn} onBack={resetFlow} />;
@@ -617,9 +643,22 @@ export default function Page() {
             case 'nameInput':
                 return (
                     <NameInput
+                        flow="checkin"
                         appointments={appointments}
                         onSubmit={handleCpfSubmit}
                         onSelectAppointment={handleSelectSuggestion}
+                        onBack={resetFlow}
+                        onHelpClick={handleHelpClick}
+                    />
+                );
+
+            case 'paymentCpfInput':
+                return (
+                    <NameInput
+                        flow="payment"
+                        appointments={appointments.filter((a) => !a.paid)}
+                        onSubmit={handleCpfSubmitPayment}
+                        onSelectAppointment={handleSelectSuggestionPayment}
                         onBack={resetFlow}
                         onHelpClick={handleHelpClick}
                     />

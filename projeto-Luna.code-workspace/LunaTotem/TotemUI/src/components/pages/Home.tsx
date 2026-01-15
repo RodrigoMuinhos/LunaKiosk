@@ -3,10 +3,11 @@ import { PageContainer } from '../PageContainer';
 
 interface HomeProps {
   onCheckIn: () => void;
+  onPayment?: () => void;
   onHelpClick?: () => void;
 }
 
-export function Home({ onCheckIn, onHelpClick }: HomeProps) {
+export function Home({ onCheckIn, onPayment, onHelpClick }: HomeProps) {
   return (
     <PageContainer onHelpClick={onHelpClick}>
       <div className="w-full flex flex-col items-center gap-12">
@@ -45,6 +46,33 @@ export function Home({ onCheckIn, onHelpClick }: HomeProps) {
               <span>Acabei de chegar</span>
             </div>
           </Button>
+
+          {onPayment && (
+            <Button
+              variant="secondary"
+              size="xl"
+              onClick={onPayment}
+              className="w-full"
+            >
+              <div className="flex items-center justify-center gap-4">
+                <svg
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <line x1="2" y1="10" x2="22" y2="10" />
+                  <line x1="6" y1="15" x2="10" y2="15" />
+                </svg>
+                <span>Ir para pagamento</span>
+              </div>
+            </Button>
+          )}
 
         </div>
       </div>
