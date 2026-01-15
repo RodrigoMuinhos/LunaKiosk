@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { maskCPF, maskCPFWithHiddenCenter, stripCPF } from '@/lib/cpf';
 import { FlowType, getFlowSteps } from '@/lib/flowSteps';
 import { Button } from '../Button';
@@ -13,10 +13,29 @@ interface NameInputProps {
   appointments?: Appointment[];
   onSelectAppointment?: (apt: Appointment) => void;
   onHelpClick?: () => void;
+  onCpfChange?: (digits: string) => void;
+  suggestionsMode?: 'filter' | 'direct';
+  suggestMinDigits?: number;
+  isSearching?: boolean;
 }
 
-export function NameInput({ onSubmit, onBack, flow = 'checkin', appointments = [], onSelectAppointment, onHelpClick }: NameInputProps) {
+export function NameInput({
+  onSubmit,
+  onBack,
+  flow = 'checkin',
+  appointments = [],
+  onSelectAppointment,
+  onHelpClick,
+  onCpfChange,
+  suggestionsMode = 'filter',
+  suggestMinDigits = 3,
+  isSearching = false,
+}: NameInputProps) {
   const [cpf, setCpf] = useState('');
+
+  useEffect(() => {
+    onCpfChange?.(stripCPF(cpf));
+  }, [cpf, onCpfChange]);
 
   const subtitle =
     flow === 'payment'
@@ -98,44 +117,55 @@ export function NameInput({ onSubmit, onBack, flow = 'checkin', appointments = [
             </Button>
           </div>
           {/* Live suggestions */}
-          {stripCPF(cpf).length >= 1 && (
-            <div className="mt-4">
-              {(() => {
-                const digits = stripCPF(cpf);
-                const results = appointments
-                  .filter((a) => {
-                    const patientCpf = (a.patient.cpf || a.cpf || '').replace(/\D/g, '');
-                    return digits.length > 0 && patientCpf.includes(digits);
-                  })
-                  .slice(0, 10);
-                if (results.length === 0) {
-                  return <p className="text-sm text-gray-500">Nenhum resultado</p>;
-                }
-                return (
-                  <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
-                    {results.map((a) => (
-                      <li key={a.id}>
-                        <button
-                          type="button"
-                          onClick={() => onSelectAppointment?.(a)}
-                          className="w-full text-left px-4 py-3 hover:bg-[#F6F2EC]"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-gray-800 font-medium">{a.patient.name}</span>
-                            <span className="text-xs text-[#D3A67F]">{a.time}</span>
-                          </div>
-                          <div className="text-xs text-gray-500 flex justify-between">
-                            <span>{a.doctor}</span>
-                            <span>CPF {maskCPFWithHiddenCenter(a.patient.cpf || a.cpf || '')}</span>
-                          </div>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                );
-              })()}
-            </div>
-          )}
+          {(() => {
+            // Sugestões aparecem conforme digita, sem mostrar "Nenhum resultado".
+            // No modo 'direct', o pai já envia a lista pronta (ex: vinda do backend).
+            const digits = stripCPF(cpf);
+            if (!onSelectAppointment) return null;
+            if (digits.length < suggestMinDigits) return null;
+
+            const results =
+              suggestionsMode === 'direct'
+                ? appointments.slice(0, 10)
+                : appointments
+                    .filter((a) => {
+                      const patientCpf = (a.patient.cpf || a.cpf || '').replace(/\D/g, '');
+                      return digits.length > 0 && patientCpf.includes(digits);
+                    })
+                    .slice(0, 10);
+
+            if (!results.length) {
+              if (isSearching) {
+                return <p className="mt-3 text-sm text-gray-500">Buscando...</p>;
+              }
+              return null;
+            }
+
+            return (
+              <div className="mt-4">
+                <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+                  {results.map((a) => (
+                    <li key={a.id}>
+                      <button
+                        type="button"
+                        onClick={() => onSelectAppointment(a)}
+                        className="w-full text-left px-4 py-3 hover:bg-[#F6F2EC]"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-800 font-medium">{a.patient.name}</span>
+                          <span className="text-xs text-[#D3A67F]">{a.time}</span>
+                        </div>
+                        <div className="text-xs text-gray-500 flex justify-between">
+                          <span>{a.doctor}</span>
+                          <span>CPF {maskCPFWithHiddenCenter(a.patient.cpf || a.cpf || '')}</span>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })()}
         </div>
 
         {/* On-screen keyboard for touch devices without hardware keyboard */}

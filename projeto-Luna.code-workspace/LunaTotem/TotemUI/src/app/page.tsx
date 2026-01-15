@@ -87,12 +87,12 @@ const buildAppointments = (apiAppointments: ApiAppointment[], patients: ApiPatie
 import { Shield, Video } from 'lucide-react';
 import { notifyPaymentConfirmed } from '../lib/paymentBridge';
 import { LoginModal } from '../components/auth/LoginModal';
+import { toast } from 'sonner';
 
 type Screen =
     | 'home'
     | 'letterSelection'
     | 'patientList'
-    | 'phoneInput'
     | 'nameInput'
     | 'patientConfirmation'
     | 'photoCapture'
@@ -100,7 +100,6 @@ type Screen =
     | 'paymentCpfInput'
     | 'paymentLetterSelection'
     | 'paymentPatientList'
-    | 'paymentPhoneInput'
     | 'paymentConfirmation'
     | 'paymentDecision'
     | 'installmentSelection'
@@ -108,6 +107,40 @@ type Screen =
     | 'paymentSuccess';
 
 export default function Page() {
+
+    const buildAppointmentsFromApiOnly = (apiAppointments: ApiAppointment[]): UIAppointment[] => {
+        return apiAppointments.map((apiAppointment) => {
+            const patientIdKey =
+                (apiAppointment as any).patientId !== null && (apiAppointment as any).patientId !== undefined
+                    ? String((apiAppointment as any).patientId)
+                    : '';
+
+            const patient = {
+                id: patientIdKey,
+                name: apiAppointment.patient ?? 'Paciente',
+                cpf: apiAppointment.cpf ?? '',
+                phone: '',
+            };
+
+            const rawAmount = apiAppointment.amount;
+            const amount = typeof rawAmount === 'string' ? Number(rawAmount) : rawAmount;
+            const paid = normalizeBoolean((apiAppointment as any).paid);
+
+            return {
+                id: apiAppointment.id ?? '',
+                patientId: patientIdKey,
+                patient,
+                doctor: apiAppointment.doctor,
+                specialty: apiAppointment.specialty,
+                date: apiAppointment.date,
+                time: apiAppointment.time,
+                status: apiAppointment.status,
+                paid,
+                amount: Number.isNaN(amount) ? 0 : amount,
+                cpf: apiAppointment.cpf,
+            };
+        });
+    };
     const router = useRouter();
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
     const [isRestMode, setIsRestMode] = useState(false);
@@ -132,10 +165,58 @@ export default function Page() {
     const [paymentDecisionMode, setPaymentDecisionMode] = useState<'checkin' | 'payment'>('payment');
     const closeVideoOverlay = () => setIsVideoOpen(false);
 
+    // Payment search (CPF incremental)
+    const [paymentCpfDigits, setPaymentCpfDigits] = useState('');
+    const [paymentSearchResults, setPaymentSearchResults] = useState<UIAppointment[]>([]);
+    const [isPaymentSearching, setIsPaymentSearching] = useState(false);
+
     const handleHelpClick = () => {
         setIsTourOpen(true);
     };
     const refreshAppointmentsForSearch = async (): Promise<UIAppointment[] | null> => {
+
+            // Busca incremental para pagamento: conforme digita CPF, busca no backend e mostra sugestões.
+            useEffect(() => {
+                if (currentScreen !== 'paymentCpfInput') {
+                    setPaymentSearchResults([]);
+                    setIsPaymentSearching(false);
+                    return;
+                }
+
+                const digits = (paymentCpfDigits || '').replace(/\D/g, '');
+                if (digits.length < 3) {
+                    setPaymentSearchResults([]);
+                    setIsPaymentSearching(false);
+                    return;
+                }
+
+                let cancelled = false;
+                setIsPaymentSearching(true);
+                const handle = window.setTimeout(async () => {
+                    try {
+                        const apiResults = await appointmentAPI.search(digits);
+                        const built = buildAppointmentsFromApiOnly(apiResults);
+                        const unpaid = built.filter((a) => !a.paid);
+                        if (!cancelled) {
+                            setPaymentSearchResults(unpaid.slice(0, 10));
+                        }
+                    } catch (error) {
+                        console.error('Erro ao buscar pagamentos (incremental)', error);
+                        if (!cancelled) {
+                            setPaymentSearchResults([]);
+                        }
+                    } finally {
+                        if (!cancelled) {
+                            setIsPaymentSearching(false);
+                        }
+                    }
+                }, 300);
+
+                return () => {
+                    cancelled = true;
+                    window.clearTimeout(handle);
+                };
+            }, [currentScreen, paymentCpfDigits]);
         const token = typeof window !== 'undefined' ? window.localStorage.getItem('lv_token') : null;
         const hasValidToken =
             !!token && token !== 'undefined' && token !== 'null' && token.split('.').length === 3;
@@ -430,11 +511,39 @@ export default function Page() {
     };
 
     const handleCpfSubmitPayment = async (cpfValue: string) => {
-        const refreshed = await refreshAppointmentsForSearch();
-        const source = refreshed && refreshed.length ? refreshed : appointments;
-        const unpaid = filterAppointmentsByCpf(cpfValue, source).filter((appointment) => !appointment.paid);
-        setFilteredAppointments(unpaid);
-        setCurrentScreen('paymentPatientList');
+        const cleanCpf = (cpfValue || '').replace(/\D/g, '');
+        if (cleanCpf.length < 3) {
+            toast.error('Digite pelo menos 3 dígitos do CPF.');
+            return;
+        }
+
+        setIsLoadingAppointments(true);
+        try {
+            const apiResults = await appointmentAPI.search(cleanCpf);
+            const built = buildAppointmentsFromApiOnly(apiResults);
+            const unpaid = built.filter((appointment) => !appointment.paid);
+
+            if (unpaid.length === 0) {
+                toast.info('Nenhum pagamento pendente encontrado para este CPF.');
+                return;
+            }
+
+            if (unpaid.length === 1) {
+                setSelectedAppointment(unpaid[0]);
+                setPaymentMethod(null);
+                setPaymentDecisionMode('payment');
+                setCurrentScreen('paymentDecision');
+                return;
+            }
+
+            setFilteredAppointments(unpaid);
+            setCurrentScreen('paymentPatientList');
+        } catch (error) {
+            console.error('Erro ao buscar pagamentos por CPF', error);
+            toast.error('Erro ao buscar pagamentos. Tente novamente.');
+        } finally {
+            setIsLoadingAppointments(false);
+        }
     };
 
     const handleSelectSuggestion = (apt: UIAppointment) => {
@@ -535,17 +644,8 @@ export default function Page() {
     };
 
     const handleNotFoundPayment = () => {
-        setCurrentScreen('paymentPhoneInput');
-    };
-
-    const handlePhoneSubmitPayment = async (phone: string) => {
-        const refreshed = await refreshAppointmentsForSearch();
-        const source = refreshed && refreshed.length ? refreshed : appointments;
-        const unpaidAppointments = filterAppointmentsByPhone(phone, source).filter(
-            (appointment) => !appointment.paid
-        );
-        setFilteredAppointments(unpaidAppointments);
-        setCurrentScreen('paymentPatientList');
+        // Não usar busca por telefone no fluxo de pagamento.
+        setCurrentScreen('paymentCpfInput');
     };
 
     const handleSelectPaymentMethod = (method: PaymentMethod) => {
@@ -653,15 +753,6 @@ export default function Page() {
                     />
                 );
 
-            case 'phoneInput':
-                return (
-                    <PhoneInput
-                        onSubmit={handlePhoneSubmit}
-                        onBack={resetFlow}
-                        flow="checkin"
-                    />
-                );
-
             case 'nameInput':
                 return (
                     <NameInput
@@ -678,11 +769,15 @@ export default function Page() {
                 return (
                     <NameInput
                         flow="payment"
-                        appointments={appointments.filter((a) => !a.paid)}
+                        appointments={paymentSearchResults}
                         onSubmit={handleCpfSubmitPayment}
                         onSelectAppointment={handleSelectSuggestionPayment}
                         onBack={resetFlow}
                         onHelpClick={handleHelpClick}
+                        onCpfChange={setPaymentCpfDigits}
+                        suggestionsMode="direct"
+                        suggestMinDigits={3}
+                        isSearching={isPaymentSearching}
                     />
                 );
 
@@ -728,13 +823,8 @@ export default function Page() {
                 );
 
             case 'paymentPhoneInput':
-                return (
-                    <PhoneInput
-                        flow="payment"
-                        onSubmit={handlePhoneSubmitPayment}
-                        onBack={resetFlow}
-                    />
-                );
+                // fluxo removido
+                return null;
 
             case 'paymentDecision':
                 return selectedAppointment ? (
