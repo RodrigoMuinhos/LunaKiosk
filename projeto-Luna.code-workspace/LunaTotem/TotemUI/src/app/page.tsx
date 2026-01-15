@@ -93,6 +93,7 @@ type Screen =
     | 'home'
     | 'letterSelection'
     | 'patientList'
+    | 'paymentList'
     | 'nameInput'
     | 'patientConfirmation'
     | 'photoCapture'
@@ -217,9 +218,11 @@ export default function Page() {
 
         const handle = window.setTimeout(async () => {
             try {
+                console.log('[PAYMENT SEARCH] Buscando pagamentos pendentes para CPF:', digits);
                 const apiResults = await appointmentAPI.searchUnpaid(digits);
                 const built = buildAppointmentsFromApiOnly(apiResults);
                 const unpaid = built.filter((a) => !a.paid);
+                console.log('[PAYMENT SEARCH] Resultados encontrados:', unpaid.length);
                 if (!cancelled) {
                     setPaymentSearchResults(unpaid.slice(0, 10));
                 }
@@ -233,7 +236,7 @@ export default function Page() {
                     setIsPaymentSearching(false);
                 }
             }
-        }, 300);
+        }, 200);
 
         return () => {
             cancelled = true;
@@ -535,7 +538,11 @@ export default function Page() {
                 return;
             }
 
-            setPaymentSearchResults(unpaid);
+            // Se houver múltiplos resultados, exibir a lista dedicada do fluxo de pagamento
+            setSelectedAppointment(null);
+            setFilteredAppointments(unpaid);
+            setPaymentSearchResults(unpaid.slice(0, 10));
+            setCurrentScreen('paymentList');
             return;
         } catch (error) {
             console.error('Erro ao buscar pagamentos por CPF', error);
@@ -551,6 +558,13 @@ export default function Page() {
     };
 
     const handleSelectSuggestionPayment = (apt: UIAppointment) => {
+        setSelectedAppointment(apt);
+        setPaymentMethod(null);
+        setPaymentDecisionMode('payment');
+        setCurrentScreen('paymentDecision');
+    };
+
+    const handleSelectPaymentFromList = (apt: UIAppointment) => {
         setSelectedAppointment(apt);
         setPaymentMethod(null);
         setPaymentDecisionMode('payment');
@@ -732,6 +746,17 @@ export default function Page() {
                         appointments={filteredAppointments}
                         onSelectPatient={handleSelectPatient}
                         onNotFound={handleNotFoundCheckIn}
+                        onBack={resetFlow}
+                    />
+                );
+
+            case 'paymentList':
+                return (
+                    <PatientList
+                        isPaymentFlow
+                        appointments={filteredAppointments}
+                        onSelectPatient={handleSelectPaymentFromList}
+                        onNotFound={handleNotFoundPayment}
                         onBack={resetFlow}
                     />
                 );

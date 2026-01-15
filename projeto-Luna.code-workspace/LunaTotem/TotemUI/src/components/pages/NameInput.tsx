@@ -122,7 +122,18 @@ export function NameInput({
             // No modo 'direct', o pai já envia a lista pronta (ex: vinda do backend).
             const digits = stripCPF(cpf);
             if (!onSelectAppointment) return null;
-            if (digits.length < suggestMinDigits) return null;
+            if (digits.length < suggestMinDigits) {
+              return null;
+            }
+
+            // Mostrar "Buscando..." se está pesquisando
+            if (isSearching) {
+              return (
+                <div className="mt-4 text-center">
+                  <p className="text-sm text-gray-500 animate-pulse">Buscando consultas...</p>
+                </div>
+              );
+            }
 
             const results =
               suggestionsMode === 'direct'
@@ -135,30 +146,35 @@ export function NameInput({
                     .slice(0, 10);
 
             if (!results.length) {
-              if (isSearching) {
-                return <p className="mt-3 text-sm text-gray-500">Buscando...</p>;
-              }
               return null;
             }
 
             return (
               <div className="mt-4">
-                <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+                <p className="text-xs text-gray-500 mb-2 px-1">
+                  {results.length === 1 ? '1 consulta encontrada' : `${results.length} consultas encontradas`}
+                </p>
+                <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden bg-white shadow-md">
                   {results.map((a) => (
                     <li key={a.id}>
                       <button
                         type="button"
                         onClick={() => onSelectAppointment(a)}
-                        className="w-full text-left px-4 py-3 hover:bg-[#F6F2EC]"
+                        className="w-full text-left px-4 py-3 hover:bg-[#F6F2EC] transition-colors"
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-gray-800 font-medium">{a.patient.name}</span>
                           <span className="text-xs text-[#D3A67F]">{a.time}</span>
                         </div>
-                        <div className="text-xs text-gray-500 flex justify-between">
+                        <div className="text-xs text-gray-500 flex justify-between mt-1">
                           <span>{a.doctor}</span>
                           <span>CPF {maskCPFWithHiddenCenter(a.patient.cpf || a.cpf || '')}</span>
                         </div>
+                        {a.amount && a.amount > 0 && (
+                          <div className="text-xs text-[#D3A67F] mt-1 font-medium">
+                            R$ {a.amount.toFixed(2).replace('.', ',')}
+                          </div>
+                        )}
                       </button>
                     </li>
                   ))}
