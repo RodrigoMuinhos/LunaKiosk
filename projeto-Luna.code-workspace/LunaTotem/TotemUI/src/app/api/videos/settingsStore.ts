@@ -14,9 +14,31 @@ export interface VideoSettings {
 
 // In the Electron kiosk (packaged), process.cwd() can point to a read-only directory.
 // Allow overriding where we persist JSON data.
-const DATA_DIR = process.env.KIOSK_DATA_DIR
-  ? path.resolve(process.env.KIOSK_DATA_DIR)
-  : path.join(process.cwd(), 'data');
+function getWritableDataDir() {
+  if (process.env.KIOSK_DATA_DIR) {
+    return path.resolve(process.env.KIOSK_DATA_DIR);
+  }
+
+  // Serverless providers (ex: Vercel) typically run on read-only filesystem.
+  // Use OS temp directory so PUT /settings doesn't fail with 500.
+  const isServerless =
+    !!process.env.VERCEL ||
+    !!process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    !!process.env.LAMBDA_TASK_ROOT;
+
+  if (isServerless) {
+    const tmpBase =
+      process.env.TMPDIR ||
+      process.env.TEMP ||
+      process.env.TMP ||
+      (process.platform === 'win32' ? process.cwd() : '/tmp');
+    return path.join(tmpBase, 'luna-kiosk-data');
+  }
+
+  return path.join(process.cwd(), 'data');
+}
+
+const DATA_DIR = getWritableDataDir();
 const DATA_FILE = path.join(DATA_DIR, 'video-settings.json');
 
 const DEFAULT_SETTINGS: VideoSettings = {
