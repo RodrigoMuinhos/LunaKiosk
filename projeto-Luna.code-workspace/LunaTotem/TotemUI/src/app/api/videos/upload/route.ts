@@ -16,12 +16,14 @@ import { readVideoSettings } from '../settingsStore';
 export async function POST(request: Request) {
   try {
     const settings = await readVideoSettings();
-    if (settings.source === 'folder') {
+    if (settings.source !== 'uploads') {
       return NextResponse.json(
         {
           success: false,
           error:
-            'Upload desabilitado: o Totem está configurado para usar vídeos de uma pasta local.',
+            settings.source === 'folder'
+              ? 'Upload desabilitado: o Totem está configurado para usar vídeos de uma pasta local.'
+              : 'Upload desabilitado: o Totem está configurado para usar vídeos de uma playlist (URL).',
         },
         { status: 409 }
       );

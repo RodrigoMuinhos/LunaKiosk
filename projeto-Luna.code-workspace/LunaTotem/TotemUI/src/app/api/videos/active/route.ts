@@ -51,9 +51,83 @@ async function listFolderVideos(folderPath: string) {
     });
 }
 
+async function fetchPlaylist(playlistUrl: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+  try {
+    const response = await fetch(playlistUrl, {
+      signal: controller.signal,
+      headers: {
+        accept: 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = (await response.json()) as any;
+    const items = Array.isArray(data?.items) ? data.items : [];
+    return items
+      .map((it: any) => {
+        const key = typeof it?.key === 'string' ? it.key : '';
+        const url = typeof it?.url === 'string' ? it.url : '';
+        return { key: key.trim(), url: url.trim() };
+      })
+      .filter((x) => x.key && x.url);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function GET() {
   try {
     const settings = await readVideoSettings();
+
+    if (settings.source === 'playlist') {
+      if (!settings.playlistUrl) {
+        return NextResponse.json({
+          success: true,
+          videos: [],
+          warning: 'Configure a URL da playlist para carregar os vídeos do descanso.',
+        });
+      }
+
+      try {
+        const items = await fetchPlaylist(settings.playlistUrl);
+        const limited = items.slice(0, 15);
+
+        const videos = limited.map((item, idx) => {
+          const key = item.key;
+          const filename = key.split('/').pop() || key;
+          const title = filename.replace(/\.[^.]+$/, '');
+          return {
+            id: `playlist:${key}`,
+            filename,
+            title,
+            description: '',
+            displayOrder: idx + 1,
+            fileSize: 0,
+            isActive: true,
+            status: 'ACTIVE',
+            createdAt: new Date(0).toISOString(),
+            filePath: item.url,
+          };
+        });
+
+        return NextResponse.json({ success: true, videos });
+      } catch (error) {
+        console.error('Erro ao carregar playlist remota', error);
+        return NextResponse.json({
+          success: true,
+          videos: [],
+          warning:
+            'Não foi possível carregar a playlist de vídeos (verifique a URL e se está pública).',
+        });
+      }
+    }
+
     if (settings.source === 'folder' && settings.folderPath) {
       if (process.platform !== 'win32') {
         return NextResponse.json({

@@ -23,6 +23,8 @@ interface DashboardSummary {
     date: string;
     time: string;
     status: string;
+    paid?: boolean;
+    amount?: number;
   }>;
 }
 
@@ -37,6 +39,8 @@ export function Dashboard({ refreshCallbackRef }: DashboardProps) {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastGoodSummaryRef = useRef<DashboardSummary | null>(null);
+  const lastErrorToastAtRef = useRef<number>(0);
   const normalizedAuthRole = normalizeRole(authRole);
   const [userRole, setUserRole] = useState<Role | null>(
     isValidRole(normalizedAuthRole) ? (normalizedAuthRole as Role) : null
@@ -85,16 +89,24 @@ export function Dashboard({ refreshCallbackRef }: DashboardProps) {
     try {
       const data = await request(remoteEndpoint);
       setSummary(data);
+      lastGoodSummaryRef.current = data;
       setLastUpdated(new Date());
     } catch (remoteError) {
       console.warn('Dashboard summary falling back to local data', remoteError);
       try {
         const data = await request(localEndpoint);
         setSummary(data);
+        lastGoodSummaryRef.current = data;
         setLastUpdated(new Date());
       } catch (fallbackError) {
         console.error('Error loading dashboard:', fallbackError);
-        setSummary(null);
+        // Keep last known good data to avoid the dashboard randomly going blank on transient failures.
+        setSummary((prev) => prev ?? lastGoodSummaryRef.current);
+        const now = Date.now();
+        if (now - lastErrorToastAtRef.current > 60_000) {
+          lastErrorToastAtRef.current = now;
+          toast.error('Falha ao atualizar o dashboard. Exibindo os últimos dados carregados.');
+        }
       }
     } finally {
       setLoading(false);
@@ -219,6 +231,15 @@ export function Dashboard({ refreshCallbackRef }: DashboardProps) {
 
   const getStatusColor = (status: string) => getStatusBadgeClasses(status);
 
+  const renderPaidBadge = (paid: any) => {
+    const isPaid = Boolean(paid);
+    const label = isPaid ? 'Pago' : 'Não pago';
+    const classes = isPaid
+      ? 'bg-green-100 text-green-800 border border-green-200'
+      : 'bg-amber-100 text-amber-800 border border-amber-200';
+    return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${classes}`}>{label}</span>;
+  };
+
   const handleStatusChange = async (appointmentId: string, currentStatus: string) => {
     const currentIndex = statusOptions.indexOf(currentStatus);
     const nextIndex = (currentIndex + 1) % statusOptions.length;
@@ -325,6 +346,7 @@ export function Dashboard({ refreshCallbackRef }: DashboardProps) {
                 { key: 'doctor', header: 'Médico', cell: (a) => <span className="text-gray-600">{a.doctor}</span> },
                 { key: 'date', header: 'Data', cell: (a) => <span className="text-gray-600">{formatDate(a.date)}</span> },
                 { key: 'time', header: 'Horário', cell: (a) => <span className="text-gray-600">{a.time}</span> },
+                { key: 'paid', header: 'Pagamento', cell: (a) => renderPaidBadge((a as any).paid) },
                 { key: 'status', header: 'Status', cell: (a) => (
                   <button
                     onClick={() => handleStatusChange(a.id, a.status)}
@@ -341,6 +363,7 @@ export function Dashboard({ refreshCallbackRef }: DashboardProps) {
                   <div>
                     <div className="text-sm font-medium text-gray-800">{appointment.patient}</div>
                     <div className="text-xs text-gray-500">{appointment.doctor}</div>
+                    <div className="mt-2">{renderPaidBadge((appointment as any).paid)}</div>
                   </div>
                   <div className="text-xs text-gray-500 text-right">
                     <div>{formatDate(appointment.date)}</div>

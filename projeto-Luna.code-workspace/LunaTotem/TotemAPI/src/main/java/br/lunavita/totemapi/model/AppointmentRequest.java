@@ -15,6 +15,10 @@ public class AppointmentRequest {
     private String type;
     private String patientEmail;
     private String tenantId;
+    /** Optional: allows updating appointment workflow status (e.g. aguardando/confirmado/etc). */
+    private String status;
+    /** Optional: allows toggling payment state without overloading the status field. */
+    private Boolean paid;
 
     public String getPatient() {
         return patient;
@@ -102,5 +106,21 @@ public class AppointmentRequest {
 
     public void setTenantId(String tenantId) {
         this.tenantId = tenantId;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Boolean getPaid() {
+        return paid;
+    }
+
+    public void setPaid(Boolean paid) {
+        this.paid = paid;
     }
 }

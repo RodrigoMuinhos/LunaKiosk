@@ -55,6 +55,16 @@ async function listFolderVideos(folderPath: string) {
 export async function GET() {
   try {
     const settings = await readVideoSettings();
+
+    if (settings.source === 'playlist') {
+      return NextResponse.json({
+        success: true,
+        videos: [],
+        warning:
+          'Modo playlist ativo: os vídeos são carregados de uma URL pública (ex: Cloudflare Worker + R2).',
+      });
+    }
+
     if (settings.source === 'folder' && settings.folderPath) {
       if (process.platform !== 'win32') {
         return NextResponse.json({

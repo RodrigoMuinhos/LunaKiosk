@@ -120,8 +120,8 @@ public class DataStoreService {
         apt.setSpecialty(request.getSpecialty());
         apt.setDate(request.getDate());
         apt.setTime(request.getTime());
-        apt.setStatus("aguardando");
-        apt.setPaid(false);
+        apt.setStatus(request.getStatus() != null && !request.getStatus().isBlank() ? request.getStatus() : "aguardando");
+        apt.setPaid(request.getPaid() != null ? request.getPaid() : false);
         apt.setAmount(request.getAmount());
         apt.setCpf(request.getCpf());
         apt.setType(request.getType());
@@ -176,6 +176,12 @@ public class DataStoreService {
             apt.setAmount(request.getAmount());
             apt.setCpf(request.getCpf());
             apt.setPatientEmail(request.getPatientEmail());
+            if (request.getStatus() != null && !request.getStatus().isBlank()) {
+                apt.setStatus(request.getStatus());
+            }
+            if (request.getPaid() != null) {
+                apt.setPaid(request.getPaid());
+            }
             return appointmentRepository.save(apt);
         });
     }
@@ -196,6 +202,12 @@ public class DataStoreService {
             apt.setCpf(request.getCpf());
             apt.setPatientEmail(request.getPatientEmail());
             apt.setTenantId(tenantId);
+            if (request.getStatus() != null && !request.getStatus().isBlank()) {
+                apt.setStatus(request.getStatus());
+            }
+            if (request.getPaid() != null) {
+                apt.setPaid(request.getPaid());
+            }
             return appointmentRepository.save(apt);
         });
     }
@@ -407,7 +419,13 @@ public class DataStoreService {
     }
 
     public DashboardSummary getDashboardSummary() {
-        List<Appointment> all = appointmentRepository.findAll();
+        return getDashboardSummary(null);
+    }
+
+    public DashboardSummary getDashboardSummary(String tenantId) {
+        List<Appointment> all = (tenantId != null && !tenantId.isBlank())
+                ? appointmentRepository.findAllByTenantId(tenantId)
+                : appointmentRepository.findAll();
         LocalDate today = LocalDate.now();
 
         // Consultas a partir de hoje (incluindo hoje)
@@ -442,7 +460,9 @@ public class DataStoreService {
 
         // Cálculo simples de horários livres: assume 20 slots/dia por médico para dias
         // restantes do mês
-        int doctorsCount = doctorRepository.findAll().size();
+        int doctorsCount = (int) ((tenantId != null && !tenantId.isBlank())
+            ? doctorRepository.countByTenantId(tenantId)
+            : doctorRepository.count());
         int slotsPerDoctorPerDay = 20;
         LocalDate monthEnd = today.withDayOfMonth(today.lengthOfMonth());
         long remainingDays = today.datesUntil(monthEnd.plusDays(1)).count();

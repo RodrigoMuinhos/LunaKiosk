@@ -13,6 +13,8 @@ export type DashboardSummary = {
     date: string;
     time: string;
     status: string;
+    paid: boolean;
+    amount: number;
   }>;
   fullDetail?: {
     pendingAppointments: number;
@@ -23,7 +25,10 @@ export type DashboardSummary = {
 export async function buildDashboardSummary(full = false): Promise<DashboardSummary> {
   const [appointments, patients] = await Promise.all([readAppointments(), readPatients()]);
 
-  const scheduledCount = appointments.filter((appt) => (appt.status ?? '').toLowerCase() !== 'cancelada').length;
+  const scheduledCount = appointments.filter((appt) => {
+    const s = String(appt.status ?? '').toLowerCase();
+    return s !== 'cancelada' && s !== 'cancelado' && s !== 'canceled' && s !== 'cancelled';
+  }).length;
   const receivables = appointments
     .filter((appt) => !appt.paid)
     .reduce((total, appt) => total + (appt.amount ?? 0), 0);
@@ -41,6 +46,8 @@ export async function buildDashboardSummary(full = false): Promise<DashboardSumm
       date: appt.date ?? '',
       time: appt.time ?? '',
       status: appt.status,
+      paid: Boolean(appt.paid),
+      amount: Number(appt.amount ?? 0),
     }));
 
   const summary: DashboardSummary = {
