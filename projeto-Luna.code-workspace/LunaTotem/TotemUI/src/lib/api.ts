@@ -325,6 +325,9 @@ export const appointmentAPI = {
   getUpcoming: () => fetchAPI<Appointment[]>(API_ENDPOINTS.appointmentUpcoming),
 
   search: (query: string) => fetchAPI<Appointment[]>(API_ENDPOINTS.appointmentSearch(query)),
+
+  // Payment flow: search unpaid appointments (any date) by CPF/name
+  searchUnpaid: (query: string) => fetchAPI<Appointment[]>(API_ENDPOINTS.appointmentUnpaidSearch(query)),
 };
 
 // Payment API

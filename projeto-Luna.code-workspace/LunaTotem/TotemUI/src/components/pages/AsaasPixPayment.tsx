@@ -240,7 +240,7 @@ export function AsaasPixPayment({ appointmentId, onComplete, onBack, flow = 'pay
 
 
   const steps = getFlowSteps(flow);
-  const currentStep = flow === 'checkin' ? 3 : 2;
+  const currentStep = flow === 'checkin' ? 3 : 1;
 
   const formatTimeLeft = (seconds: number) => {
     const safe = Math.max(0, Math.floor(seconds));

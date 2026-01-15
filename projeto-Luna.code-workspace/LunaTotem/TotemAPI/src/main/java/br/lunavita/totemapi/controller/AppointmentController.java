@@ -68,6 +68,15 @@ public class AppointmentController {
         return store.searchUpcomingAppointments(q);
     }
 
+    @GetMapping("/unpaid/search")
+    public List<Appointment> searchUnpaid(@RequestParam("q") String q,
+            @AuthenticationPrincipal UserContext userContext) {
+        if (userContext != null && userContext.getTenantId() != null) {
+            return store.searchUnpaidAppointments(userContext.getTenantId(), q);
+        }
+        return store.searchUnpaidAppointments(q);
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Appointment> get(@PathVariable String id,
             @AuthenticationPrincipal UserContext userContext) {

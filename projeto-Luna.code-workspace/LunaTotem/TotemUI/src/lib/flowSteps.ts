@@ -10,7 +10,6 @@ export const FLOW_STEPS: Record<FlowType, string[]> = {
   ],
   payment: [
     'Identificação',
-    'Selecionar paciente',
     'Pagamento',
     'Conclusão',
   ],

@@ -24,7 +24,7 @@ export function PaymentDecision({
 }: PaymentDecisionProps) {
   const flow = mode === 'checkin' ? 'checkin' : 'payment';
   const steps = getFlowSteps(flow);
-  const currentStep = flow === 'checkin' ? 3 : 2;
+  const currentStep = flow === 'checkin' ? 3 : 1;
 
   return (
     <PageContainer steps={steps} currentStep={currentStep}>

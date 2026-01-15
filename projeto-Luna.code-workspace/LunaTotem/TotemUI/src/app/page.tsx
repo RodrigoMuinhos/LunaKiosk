@@ -98,8 +98,6 @@ type Screen =
     | 'photoCapture'
     | 'checkInComplete'
     | 'paymentCpfInput'
-    | 'paymentLetterSelection'
-    | 'paymentPatientList'
     | 'paymentConfirmation'
     | 'paymentDecision'
     | 'installmentSelection'
@@ -174,49 +172,6 @@ export default function Page() {
         setIsTourOpen(true);
     };
     const refreshAppointmentsForSearch = async (): Promise<UIAppointment[] | null> => {
-
-            // Busca incremental para pagamento: conforme digita CPF, busca no backend e mostra sugestões.
-            useEffect(() => {
-                if (currentScreen !== 'paymentCpfInput') {
-                    setPaymentSearchResults([]);
-                    setIsPaymentSearching(false);
-                    return;
-                }
-
-                const digits = (paymentCpfDigits || '').replace(/\D/g, '');
-                if (digits.length < 3) {
-                    setPaymentSearchResults([]);
-                    setIsPaymentSearching(false);
-                    return;
-                }
-
-                let cancelled = false;
-                setIsPaymentSearching(true);
-                const handle = window.setTimeout(async () => {
-                    try {
-                        const apiResults = await appointmentAPI.search(digits);
-                        const built = buildAppointmentsFromApiOnly(apiResults);
-                        const unpaid = built.filter((a) => !a.paid);
-                        if (!cancelled) {
-                            setPaymentSearchResults(unpaid.slice(0, 10));
-                        }
-                    } catch (error) {
-                        console.error('Erro ao buscar pagamentos (incremental)', error);
-                        if (!cancelled) {
-                            setPaymentSearchResults([]);
-                        }
-                    } finally {
-                        if (!cancelled) {
-                            setIsPaymentSearching(false);
-                        }
-                    }
-                }, 300);
-
-                return () => {
-                    cancelled = true;
-                    window.clearTimeout(handle);
-                };
-            }, [currentScreen, paymentCpfDigits]);
         const token = typeof window !== 'undefined' ? window.localStorage.getItem('lv_token') : null;
         const hasValidToken =
             !!token && token !== 'undefined' && token !== 'null' && token.split('.').length === 3;
@@ -241,6 +196,50 @@ export default function Page() {
             setIsLoadingAppointments(false);
         }
     };
+
+    // Busca incremental para pagamento: conforme digita CPF, busca no backend e mostra sugestões.
+    useEffect(() => {
+        if (currentScreen !== 'paymentCpfInput') {
+            setPaymentSearchResults([]);
+            setIsPaymentSearching(false);
+            return;
+        }
+
+        const digits = (paymentCpfDigits || '').replace(/\D/g, '');
+        if (digits.length < 3) {
+            setPaymentSearchResults([]);
+            setIsPaymentSearching(false);
+            return;
+        }
+
+        let cancelled = false;
+        setIsPaymentSearching(true);
+
+        const handle = window.setTimeout(async () => {
+            try {
+                const apiResults = await appointmentAPI.searchUnpaid(digits);
+                const built = buildAppointmentsFromApiOnly(apiResults);
+                const unpaid = built.filter((a) => !a.paid);
+                if (!cancelled) {
+                    setPaymentSearchResults(unpaid.slice(0, 10));
+                }
+            } catch (error) {
+                console.error('Erro ao buscar pagamentos (incremental)', error);
+                if (!cancelled) {
+                    setPaymentSearchResults([]);
+                }
+            } finally {
+                if (!cancelled) {
+                    setIsPaymentSearching(false);
+                }
+            }
+        }, 300);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(handle);
+        };
+    }, [currentScreen, paymentCpfDigits]);
 
     useEffect(() => {
         let isActive = true;
@@ -519,7 +518,7 @@ export default function Page() {
 
         setIsLoadingAppointments(true);
         try {
-            const apiResults = await appointmentAPI.search(cleanCpf);
+            const apiResults = await appointmentAPI.searchUnpaid(cleanCpf);
             const built = buildAppointmentsFromApiOnly(apiResults);
             const unpaid = built.filter((appointment) => !appointment.paid);
 
@@ -536,8 +535,8 @@ export default function Page() {
                 return;
             }
 
-            setFilteredAppointments(unpaid);
-            setCurrentScreen('paymentPatientList');
+            setPaymentSearchResults(unpaid);
+            return;
         } catch (error) {
             console.error('Erro ao buscar pagamentos por CPF', error);
             toast.error('Erro ao buscar pagamentos. Tente novamente.');
@@ -600,22 +599,6 @@ export default function Page() {
 
     const handleCheckInComplete = () => {
         resetFlow();
-    };
-
-    const handleSelectLetterPayment = (letter: string) => {
-        setSelectedLetter(letter);
-        const unpaidAppointments = filterAppointmentsByLetter(letter).filter(
-            (appointment) => !appointment.paid
-        );
-        setFilteredAppointments(unpaidAppointments);
-        setCurrentScreen('paymentPatientList');
-    };
-
-    const handleSelectPatientPayment = (appointment: UIAppointment) => {
-        setSelectedAppointment(appointment);
-        setPaymentMethod(null);
-        setPaymentDecisionMode('payment');
-        setCurrentScreen('paymentDecision');
     };
 
     const handlePaymentDecisionAwait = () => {
@@ -801,26 +784,6 @@ export default function Page() {
                         onPayNow={handlePayAfterCheckIn}
                     />
                 ) : null;
-
-            case 'paymentLetterSelection':
-                return (
-                    <LetterSelection
-                        flow="payment"
-                        onSelectLetter={handleSelectLetterPayment}
-                        onBack={resetFlow}
-                    />
-                );
-
-            case 'paymentPatientList':
-                return (
-                    <PatientList
-                        appointments={filteredAppointments}
-                        onSelectPatient={handleSelectPatientPayment}
-                        onNotFound={handleNotFoundPayment}
-                        onBack={resetFlow}
-                        isPaymentFlow
-                    />
-                );
 
             case 'paymentPhoneInput':
                 // fluxo removido

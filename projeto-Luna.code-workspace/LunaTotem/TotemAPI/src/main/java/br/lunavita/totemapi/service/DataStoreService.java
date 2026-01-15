@@ -102,6 +102,41 @@ public class DataStoreService {
                         tenantId, today, query.trim());
     }
 
+    /**
+     * Busca agendamentos NÃO pagos (qualquer data) por nome e/ou CPF parcial.
+     *
+     * Usado pelo fluxo de pagamento do totem (o usuário costuma digitar CPF).
+     */
+    public List<Appointment> searchUnpaidAppointments(String query) {
+        if (query == null || query.trim().length() < 2) {
+            return List.of();
+        }
+        String q = query.trim();
+        String cpfPart = q.replaceAll("\\D", "");
+        if (cpfPart.length() < 2) {
+            cpfPart = "";
+        }
+        return appointmentRepository.searchUnpaidByPatientOrCpf(q, cpfPart);
+    }
+
+    /**
+     * Variante multi-tenant para busca de agendamentos NÃO pagos (qualquer data).
+     */
+    public List<Appointment> searchUnpaidAppointments(String tenantId, String query) {
+        if (query == null || query.trim().length() < 2) {
+            return List.of();
+        }
+        if (tenantId == null || tenantId.isBlank()) {
+            return searchUnpaidAppointments(query);
+        }
+        String q = query.trim();
+        String cpfPart = q.replaceAll("\\D", "");
+        if (cpfPart.length() < 2) {
+            cpfPart = "";
+        }
+        return appointmentRepository.searchUnpaidByTenantIdAndPatientOrCpf(tenantId, q, cpfPart);
+    }
+
     public Optional<Appointment> findAppointment(String id) {
         return appointmentRepository.findById(id);
     }

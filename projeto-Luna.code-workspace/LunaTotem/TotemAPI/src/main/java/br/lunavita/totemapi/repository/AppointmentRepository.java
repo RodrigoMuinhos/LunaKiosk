@@ -1,14 +1,15 @@
 package br.lunavita.totemapi.repository;
 
-import br.lunavita.totemapi.model.Appointment;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
+import br.lunavita.totemapi.model.Appointment;
 
 @Repository
 public interface AppointmentRepository extends JpaRepository<Appointment, String> {
@@ -57,6 +58,38 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
      */
     @Query("SELECT COUNT(a) FROM Appointment a WHERE a.tenantId = :tenantId AND a.paid = false")
     long countUnpaidByTenantId(@Param("tenantId") String tenantId);
+
+    /**
+     * Busca agendamentos NÃO pagos (qualquer data) por nome do paciente e/ou CPF (parcial).
+     *
+     * Observação: mantém compatibilidade com o fluxo de pagamento (buscar por CPF parcial).
+     */
+    @Query("SELECT a FROM Appointment a " +
+            "LEFT JOIN Patient p ON p.id = a.patientId AND p.tenantId = a.tenantId " +
+            "WHERE a.tenantId = :tenantId " +
+            "AND a.paid = false " +
+            "AND (LOWER(a.patient) LIKE LOWER(CONCAT('%', :q, '%')) " +
+            "     OR LOWER(p.name) LIKE LOWER(CONCAT('%', :q, '%')) " +
+            "     OR (:cpfPart <> '' AND (a.cpf LIKE CONCAT('%', :cpfPart, '%') OR p.cpf LIKE CONCAT('%', :cpfPart, '%')))) " +
+            "ORDER BY a.date DESC, a.time DESC, a.patient ASC")
+    List<Appointment> searchUnpaidByTenantIdAndPatientOrCpf(
+            @Param("tenantId") String tenantId,
+            @Param("q") String q,
+            @Param("cpfPart") String cpfPart);
+
+    /**
+     * Variante SEM filtro de tenant (não recomendado; mantido para compatibilidade).
+     */
+    @Query("SELECT a FROM Appointment a " +
+            "LEFT JOIN Patient p ON p.id = a.patientId " +
+            "WHERE a.paid = false " +
+            "AND (LOWER(a.patient) LIKE LOWER(CONCAT('%', :q, '%')) " +
+            "     OR LOWER(p.name) LIKE LOWER(CONCAT('%', :q, '%')) " +
+            "     OR (:cpfPart <> '' AND (a.cpf LIKE CONCAT('%', :cpfPart, '%') OR p.cpf LIKE CONCAT('%', :cpfPart, '%')))) " +
+            "ORDER BY a.date DESC, a.time DESC, a.patient ASC")
+    List<Appointment> searchUnpaidByPatientOrCpf(
+            @Param("q") String q,
+            @Param("cpfPart") String cpfPart);
 
     // ===== MÉTODOS DEPRECADOS (NÃO USAR - SEM FILTRO DE TENANT) =====
 

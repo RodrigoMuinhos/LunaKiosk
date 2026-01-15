@@ -28,7 +28,7 @@ export function PaymentProcessing({
   };
 
   const steps = getFlowSteps(flow);
-  const currentStep = flow === 'checkin' ? 3 : 2;
+  const currentStep = flow === 'checkin' ? 3 : 1;
 
   return (
     <PageContainer showLogo={false} showHelp={false} steps={steps} currentStep={currentStep}>

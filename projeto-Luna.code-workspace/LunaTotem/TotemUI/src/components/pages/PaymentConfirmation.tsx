@@ -36,7 +36,7 @@ export function PaymentConfirmation({
     }).format(value);
   };
   const steps = getFlowSteps(flow);
-  const currentStep = flow === 'checkin' ? 3 : 2;
+  const currentStep = flow === 'checkin' ? 3 : 1;
 
   return (
     <PageContainer steps={steps} currentStep={currentStep}>

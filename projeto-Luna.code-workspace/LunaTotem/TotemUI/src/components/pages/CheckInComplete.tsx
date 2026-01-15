@@ -76,6 +76,11 @@ export function CheckInComplete({ appointment, onFinish, onPayNow }: CheckInComp
     onPayNow?.();
   };
 
+  const handleBackToMenu = () => {
+    clearTimers();
+    onFinish();
+  };
+
   return (
     <PageContainer
       showLogo={false}
@@ -150,14 +155,31 @@ export function CheckInComplete({ appointment, onFinish, onPayNow }: CheckInComp
           <p className="text-sm text-[#4A4A4A]/50">
             Retornando ao menu inicial em {formatTimeLeft(timeLeftSeconds)}...
           </p>
-          {onPayNow && (
-            <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-3">
+            {onPayNow && (
               <p className="text-sm text-[#4A4A4A]/70">Deseja pagar agora?</p>
-              <Button variant="secondary" size="xl" onClick={handlePayNow}>
-                Ir para Pagamento
+            )}
+            <div className="flex w-full flex-col items-center justify-center gap-3 sm:flex-row">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={handleBackToMenu}
+                className="w-full sm:w-auto sm:min-w-[200px]"
+              >
+                Voltar ao menu
               </Button>
+              {onPayNow && (
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={handlePayNow}
+                  className="w-full sm:w-auto sm:min-w-[220px]"
+                >
+                  Ir para Pagamento
+                </Button>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </PageContainer>

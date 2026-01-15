@@ -42,6 +42,7 @@ export const API_ENDPOINTS = {
   appointmentNotify: (id: string) => `${API_BASE_URL}/api/appointments/${id}/notify`,
   appointmentUpcoming: `${API_BASE_URL}/api/appointments/upcoming`,
   appointmentSearch: (q: string) => `${API_BASE_URL}/api/appointments/search?q=${encodeURIComponent(q)}`,
+  appointmentUnpaidSearch: (q: string) => `${API_BASE_URL}/api/appointments/unpaid/search?q=${encodeURIComponent(q)}`,
   
   // Doctors
   doctors: `${API_BASE_URL}/api/doctors`,
