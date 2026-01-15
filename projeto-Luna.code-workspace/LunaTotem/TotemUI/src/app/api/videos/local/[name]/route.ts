@@ -33,6 +33,16 @@ function inferContentType(ext: string): string {
 
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
+    if (process.platform !== 'win32') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Streaming de pasta local só funciona no kiosk (Windows).',
+        },
+        { status: 400 }
+      );
+    }
+
     const settings = await readVideoSettings();
     if (settings.source !== 'folder' || !settings.folderPath) {
       return NextResponse.json(

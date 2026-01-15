@@ -55,8 +55,28 @@ export async function GET() {
   try {
     const settings = await readVideoSettings();
     if (settings.source === 'folder' && settings.folderPath) {
-      const videos = await listFolderVideos(settings.folderPath);
-      return NextResponse.json({ success: true, videos });
+      if (process.platform !== 'win32') {
+        return NextResponse.json({
+          success: true,
+          videos: [],
+          warning:
+            'Pasta local está configurada, mas este ambiente não tem acesso ao disco do kiosk (ex: Vercel).',
+        });
+      }
+
+      try {
+        const videos = await listFolderVideos(settings.folderPath);
+        return NextResponse.json({ success: true, videos });
+      } catch (error) {
+        console.error('Erro ao listar vídeos da pasta local', error);
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Não foi possível ler a pasta local configurada.',
+          },
+          { status: 400 }
+        );
+      }
     }
 
     const videos = await readVideos();

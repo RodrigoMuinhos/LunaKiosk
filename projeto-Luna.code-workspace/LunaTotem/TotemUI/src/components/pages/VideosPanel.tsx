@@ -171,7 +171,8 @@ export function VideosPanel() {
       });
 
       if (response.success) {
-        window.alert('Configurações salvas.');
+        const warning = typeof response.warning === 'string' ? response.warning : '';
+        window.alert(warning ? `Configurações salvas.\n\nAviso: ${warning}` : 'Configurações salvas.');
         loadSettings();
         loadVideos();
       } else {

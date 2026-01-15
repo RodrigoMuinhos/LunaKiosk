@@ -6,6 +6,14 @@ import path from 'path';
 import { promises as fs } from 'fs';
 import { readVideoSettings, writeVideoSettings } from '../settingsStore';
 
+function isWindowsAbsolutePath(value: string) {
+  return /^[a-zA-Z]:[\\/]/.test(value);
+}
+
+function isAbsoluteLike(value: string) {
+  return path.isAbsolute(value) || isWindowsAbsolutePath(value);
+}
+
 export async function GET() {
   try {
     const settings = await readVideoSettings();
@@ -35,7 +43,7 @@ export async function PUT(request: Request) {
           { status: 400 }
         );
       }
-      if (!path.isAbsolute(desiredFolderPath)) {
+      if (!isAbsoluteLike(desiredFolderPath)) {
         return NextResponse.json(
           {
             success: false,
@@ -45,19 +53,23 @@ export async function PUT(request: Request) {
           { status: 400 }
         );
       }
-      try {
-        const stat = await fs.stat(desiredFolderPath);
-        if (!stat.isDirectory()) {
+
+      // Em Vercel/Linux não há como validar/ler C:\\...; permitimos salvar para o kiosk usar.
+      if (process.platform === 'win32') {
+        try {
+          const stat = await fs.stat(desiredFolderPath);
+          if (!stat.isDirectory()) {
+            return NextResponse.json(
+              { success: false, error: 'O caminho informado não é uma pasta.' },
+              { status: 400 }
+            );
+          }
+        } catch {
           return NextResponse.json(
-            { success: false, error: 'O caminho informado não é uma pasta.' },
+            { success: false, error: 'Pasta não encontrada ou sem permissão de acesso.' },
             { status: 400 }
           );
         }
-      } catch {
-        return NextResponse.json(
-          { success: false, error: 'Pasta não encontrada ou sem permissão de acesso.' },
-          { status: 400 }
-        );
       }
     }
 
@@ -66,7 +78,11 @@ export async function PUT(request: Request) {
       folderPath: desiredSource === 'folder' ? desiredFolderPath : null,
       inactivityMinutes: payload?.inactivityMinutes,
     });
-    return NextResponse.json({ success: true, settings });
+    const warning =
+      desiredSource === 'folder' && process.platform !== 'win32'
+        ? 'Modo pasta local funciona apenas no kiosk (Windows). Em Vercel o servidor não consegue ler C:\\...'
+        : undefined;
+    return NextResponse.json({ success: true, settings, warning });
   } catch (error) {
     console.error('Erro ao salvar configurações de vídeo', error);
     return NextResponse.json(
