@@ -5,7 +5,30 @@ import { appointmentAPI, paymentAPI } from '@/lib/api';
 
 const createInFlightByAppointment = new Set<string>();
 const RETRY_DELAYS_MS = [800, 1500];
-const PIX_POLL_TIMEOUT_MS = 60_000;
+
+function parsePositiveInt(value: string | undefined | null) {
+  if (!value) return null;
+  const n = Number.parseInt(String(value), 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function getPixPollTimeoutMs() {
+  // Build-time (Next.js) configuration. Example: NEXT_PUBLIC_PIX_POLL_TIMEOUT_SECONDS=600 (10min)
+  const seconds = parsePositiveInt(process.env.NEXT_PUBLIC_PIX_POLL_TIMEOUT_SECONDS);
+  const effectiveSeconds = seconds ?? 60;
+  // Clamp to a sane range: 30s .. 30min
+  const clamped = Math.min(30 * 60, Math.max(30, effectiveSeconds));
+  return clamped * 1000;
+}
+
+function formatTimeoutLabel(ms: number) {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.round(seconds / 60);
+  return `${minutes} min`;
+}
+
+const PIX_POLL_TIMEOUT_MS = getPixPollTimeoutMs();
 const PIX_POLL_TIMEOUT_SECONDS = Math.floor(PIX_POLL_TIMEOUT_MS / 1000);
 
 interface AsaasPixPaymentProps {
@@ -106,7 +129,7 @@ export function AsaasPixPayment({ appointmentId, onComplete, onBack, flow = 'pay
       if (remaining <= 0) {
         clearPolling();
         setPaymentId('');
-        setError('Tempo limite de 1 min atingido. Gere um novo QR Code para pagar.');
+        setError(`Tempo limite de ${formatTimeoutLabel(PIX_POLL_TIMEOUT_MS)} atingido. Gere um novo QR Code para pagar.`);
         setLoading(false);
       }
     };
@@ -123,7 +146,7 @@ export function AsaasPixPayment({ appointmentId, onComplete, onBack, flow = 'pay
     pollTimeoutRef.current = setTimeout(() => {
       clearPolling();
       setPaymentId('');
-      setError('Tempo limite de 1 min atingido. Gere um novo QR Code para pagar.');
+      setError(`Tempo limite de ${formatTimeoutLabel(PIX_POLL_TIMEOUT_MS)} atingido. Gere um novo QR Code para pagar.`);
       setLoading(false);
     }, PIX_POLL_TIMEOUT_MS);
 

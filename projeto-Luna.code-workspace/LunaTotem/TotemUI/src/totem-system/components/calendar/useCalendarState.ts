@@ -303,7 +303,7 @@ export function useCalendarState() {
       await appointmentAPI.updateStatus(appointmentId, newStatus);
       setAppointments((prev) =>
         prev.map((apt) =>
-          apt.id === appointmentId ? { ...apt, status: newStatus, paid: newStatus === 'confirmado' ? true : apt.paid } : apt
+          apt.id === appointmentId ? { ...apt, status: newStatus } : apt
         )
       );
       toast.success('Status atualizado com sucesso!');
@@ -319,26 +319,11 @@ export function useCalendarState() {
       if (!appointment) return;
 
       const newPaid = !currentPaid;
-      const newStatus = newPaid ? 'confirmado' : appointment.status;
-
-      await appointmentAPI.update(appointmentId, {
-        patient: appointment.patient,
-        patientId: '',
-        doctor: appointment.doctor,
-        specialty: '',
-        date: appointment.date,
-        time: appointment.time,
-        type: appointment.type,
-        amount: appointment.amount,
-        cpf: appointment.cpf,
-        patientEmail: '',
-        status: newStatus,
-        paid: newPaid,
-      });
+      await appointmentAPI.updatePaid(appointmentId, newPaid);
 
       setAppointments((prev) =>
         prev.map((apt) =>
-          apt.id === appointmentId ? { ...apt, paid: newPaid, status: newStatus } : apt
+          apt.id === appointmentId ? { ...apt, paid: newPaid } : apt
         )
       );
       
