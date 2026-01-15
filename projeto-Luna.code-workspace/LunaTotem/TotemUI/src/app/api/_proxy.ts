@@ -4,6 +4,9 @@ declare const process: { env: Record<string, string | undefined> };
 export function normalizeBaseUrl(input?: string | null): string | null {
   const raw = (input || '').trim();
   if (!raw) return null;
+  // Allow same-origin config like '/' or '/api' to mean "no upstream" here.
+  // (The proxy needs an absolute URL to call the upstream TotemAPI.)
+  if (raw === '/' || raw.startsWith('/')) return null;
   if (/^https?:\/\//i.test(raw)) return raw.replace(/\/$/, '');
   return `https://${raw}`.replace(/\/$/, '');
 }
@@ -13,7 +16,10 @@ export function getTotemApiBaseUrl(): string | null {
   return (
     normalizeBaseUrl(process.env.TOTEM_API_PROXY_URL) ||
     normalizeBaseUrl(process.env.NEXT_PUBLIC_TOTEM_API_PROXY_URL) ||
-    normalizeBaseUrl(process.env.NEXT_PUBLIC_TOTEM_API_URL)
+    normalizeBaseUrl(process.env.NEXT_PUBLIC_TOTEM_API_URL) ||
+    // Compatibility: some setups only define these.
+    normalizeBaseUrl(process.env.NEXT_PUBLIC_API_URL) ||
+    normalizeBaseUrl(process.env.NEXT_PUBLIC_LUNATOTEM_API_URL)
   );
 }
 

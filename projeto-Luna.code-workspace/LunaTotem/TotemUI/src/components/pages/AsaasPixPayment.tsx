@@ -6,6 +6,7 @@ import { paymentAPI } from '@/lib/api';
 const createInFlightByAppointment = new Set<string>();
 const RETRY_DELAYS_MS = [800, 1500];
 const PIX_POLL_TIMEOUT_MS = 60_000;
+const PIX_POLL_TIMEOUT_SECONDS = Math.floor(PIX_POLL_TIMEOUT_MS / 1000);
 
 interface AsaasPixPaymentProps {
   appointmentId: string;
@@ -19,12 +20,16 @@ export function AsaasPixPayment({ appointmentId, onComplete, onBack, flow = 'pay
   const [paymentId, setPaymentId] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(PIX_POLL_TIMEOUT_SECONDS);
+  const [timeLeftMs, setTimeLeftMs] = useState<number>(PIX_POLL_TIMEOUT_MS);
   const createdForAppointmentRef = useRef<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const retryAttemptRef = useRef(0);
   const activeRunRef = useRef(0);
   const mountedRef = useRef(false);
+  const countdownStartRef = useRef<number>(0);
 
   const clearPolling = () => {
     if (pollIntervalRef.current) {
@@ -34,6 +39,10 @@ export function AsaasPixPayment({ appointmentId, onComplete, onBack, flow = 'pay
     if (pollTimeoutRef.current) {
       clearTimeout(pollTimeoutRef.current);
       pollTimeoutRef.current = null;
+    }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
     }
   };
 
@@ -80,6 +89,31 @@ export function AsaasPixPayment({ appointmentId, onComplete, onBack, flow = 'pay
     if (!paymentId) return;
 
     clearPolling();
+
+    // Countdown regressivo (UI) + timeout real (segurança)
+    countdownStartRef.current = Date.now();
+    setTimeLeftMs(PIX_POLL_TIMEOUT_MS);
+    setTimeLeftSeconds(PIX_POLL_TIMEOUT_SECONDS);
+
+    const updateCountdown = () => {
+      const elapsed = Date.now() - countdownStartRef.current;
+      const remaining = Math.max(0, PIX_POLL_TIMEOUT_MS - elapsed);
+      const remainingSeconds = Math.ceil(remaining / 1000);
+
+      setTimeLeftMs(remaining);
+      setTimeLeftSeconds(remainingSeconds);
+
+      if (remaining <= 0) {
+        clearPolling();
+        setPaymentId('');
+        setError('Tempo limite de 1 min atingido. Gere um novo QR Code para pagar.');
+        setLoading(false);
+      }
+    };
+
+    // Atualiza suave (barra) sem pesar.
+    countdownIntervalRef.current = setInterval(updateCountdown, 250);
+    updateCountdown();
 
     // Polling para verificar status do pagamento a cada 3 segundos
     pollIntervalRef.current = setInterval(() => {
@@ -178,6 +212,16 @@ export function AsaasPixPayment({ appointmentId, onComplete, onBack, flow = 'pay
   const steps = getFlowSteps(flow);
   const currentStep = flow === 'checkin' ? 3 : 2;
 
+  const formatTimeLeft = (seconds: number) => {
+    const safe = Math.max(0, Math.floor(seconds));
+    const mm = Math.floor(safe / 60);
+    const ss = safe % 60;
+    return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  };
+
+  const progressPct = Math.max(0, Math.min(100, (timeLeftMs / PIX_POLL_TIMEOUT_MS) * 100));
+  const isEnding = timeLeftSeconds <= 10;
+
   if (loading) {
     return (
       <PageContainer steps={steps} currentStep={currentStep}>
@@ -275,6 +319,37 @@ export function AsaasPixPayment({ appointmentId, onComplete, onBack, flow = 'pay
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md space-y-6">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-[#4A4A4A]/70">Tempo para pagar</span>
+              <span className={isEnding ? 'text-red-600 font-semibold' : 'text-[#4A4A4A]/70'}>
+                {formatTimeLeft(timeLeftSeconds)}
+              </span>
+            </div>
+
+            <div
+              className="h-2 w-full rounded-full overflow-hidden"
+              style={{ backgroundColor: '#F6EFE9' }}
+              aria-label="Barra de tempo do PIX"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={PIX_POLL_TIMEOUT_MS}
+              aria-valuenow={timeLeftMs}
+            >
+              <div
+                className="h-full transition-[width] duration-200 ease-linear"
+                style={{
+                  width: `${progressPct}%`,
+                  backgroundColor: isEnding ? '#DC2626' : '#D3A67F',
+                }}
+              />
+            </div>
+
+            {isEnding && (
+              <p className="text-xs text-red-600">Tempo quase acabando… finalize o PIX agora.</p>
+            )}
+          </div>
+
           {/* QR Code real do Asaas */}
           {qrCodeImage && (
             <div className="w-full flex justify-center">
