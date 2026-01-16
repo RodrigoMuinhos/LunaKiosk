@@ -26,6 +26,15 @@ export function VideosPanel() {
   const loadVideos = async () => {
     setLoading(true);
     try {
+      // Primeiro tenta carregar vídeos customizados do localStorage
+      const customVideos = localStorage.getItem('custom-videos');
+      if (customVideos) {
+        setVideos(JSON.parse(customVideos));
+        setLoading(false);
+        return;
+      }
+
+      // Se não tem customizados, carrega os padrões do R2
       const response = await fetch('/api/videos/playlist-r2');
       const data = await response.json();
       if (data.success && data.videos) {
@@ -59,18 +68,13 @@ export function VideosPanel() {
     }));
 
     try {
-      const response = await fetch('/api/videos/save-playlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videos: [...videos, ...newVideos] })
-      });
-
-      if (response.ok) {
-        setMessage({ type: 'success', text: `✅ ${urls.length} vídeo(s) adicionado(s) com sucesso!` });
-        await loadVideos();
-      } else {
-        setMessage({ type: 'error', text: '❌ Erro ao salvar vídeos' });
-      }
+      const updatedVideos = [...videos, ...newVideos];
+      
+      // Salvar no localStorage
+      localStorage.setItem('custom-videos', JSON.stringify(updatedVideos));
+      
+      setMessage({ type: 'success', text: `✅ ${urls.length} vídeo(s) adicionado(s) com sucesso!` });
+      setVideos(updatedVideos);
     } catch (error) {
       setMessage({ type: 'error', text: `❌ Erro: ${(error as Error).message}` });
     } finally {
@@ -90,18 +94,11 @@ export function VideosPanel() {
     const updatedVideos = videos.filter(v => v.id !== id);
     
     try {
-      const response = await fetch('/api/videos/save-playlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videos: updatedVideos })
-      });
-
-      if (response.ok) {
-        setMessage({ type: 'success', text: '✅ Vídeo removido com sucesso!' });
-        await loadVideos();
-      } else {
-        setMessage({ type: 'error', text: '❌ Erro ao remover vídeo' });
-      }
+      // Salvar no localStorage
+      localStorage.setItem('custom-videos', JSON.stringify(updatedVideos));
+      
+      setMessage({ type: 'success', text: '✅ Vídeo removido com sucesso!' });
+      setVideos(updatedVideos);
     } catch (error) {
       setMessage({ type: 'error', text: `❌ Erro: ${(error as Error).message}` });
     } finally {
@@ -116,20 +113,10 @@ export function VideosPanel() {
     setMessage(null);
 
     try {
-      const response = await fetch('/api/videos/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          inactivityMinutes: inactivityTimeout,
-          playlistUrl: '/api/videos/playlist-r2'
-        })
-      });
-
-      if (response.ok) {
-        setMessage({ type: 'success', text: '✅ Configurações salvas com sucesso!' });
-      } else {
-        setMessage({ type: 'error', text: '❌ Erro ao salvar configurações' });
-      }
+      // Salvar no localStorage
+      localStorage.setItem('video-inactivity-timeout', String(inactivityTimeout));
+      
+      setMessage({ type: 'success', text: '✅ Configurações salvas com sucesso!' });
     } catch (error) {
       setMessage({ type: 'error', text: `❌ Erro: ${(error as Error).message}` });
     } finally {

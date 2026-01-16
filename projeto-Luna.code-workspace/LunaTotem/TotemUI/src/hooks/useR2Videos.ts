@@ -35,7 +35,17 @@ export function useR2Videos(options: UseR2VideosOptions = {}) {
         setLoading(true);
         setError(null);
 
-        // Busca lista de vídeos da playlist
+        // Primeiro tenta carregar vídeos customizados do localStorage
+        const customVideos = typeof window !== 'undefined' ? localStorage.getItem('custom-videos') : null;
+        if (customVideos) {
+          const parsedVideos = JSON.parse(customVideos);
+          console.log('[R2 VIDEOS] Carregados do localStorage:', parsedVideos.length, 'vídeos');
+          setVideos(parsedVideos);
+          setLoading(false);
+          return;
+        }
+
+        // Se não tem customizados, busca da API (vídeos padrão do R2)
         const res = await fetch(playlistUrl);
         const data = await res.json();
 
@@ -45,7 +55,7 @@ export function useR2Videos(options: UseR2VideosOptions = {}) {
           throw new Error('Formato de resposta inválido');
         }
 
-        console.log('[R2 VIDEOS] Carregados:', data.videos.length, 'vídeos');
+        console.log('[R2 VIDEOS] Carregados da API:', data.videos.length, 'vídeos');
         setVideos(data.videos);
 
         // Se autoCache habilitado, tenta cachear os vídeos

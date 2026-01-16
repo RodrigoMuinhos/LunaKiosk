@@ -18,6 +18,7 @@ interface R2Video {
 export async function GET() {
   try {
     // Tentar carregar playlist do arquivo JSON (gerenciada pelo admin)
+    // Nota: Isso não funciona no Vercel (serverless), então usamos localStorage no frontend
     try {
       const fs = require('fs/promises');
       const path = require('path');
@@ -25,17 +26,17 @@ export async function GET() {
       const fileContent = await fs.readFile(playlistPath, 'utf-8');
       const playlist = JSON.parse(fileContent);
       
-      if (playlist.videos && Array.isArray(playlist.videos)) {
+      if (playlist.videos && Array.isArray(playlist.videos) && playlist.videos.length > 0) {
         return Response.json({
           success: true,
           videos: playlist.videos,
           count: playlist.videos.length,
-          source: 'admin-managed'
+          source: 'file-managed'
         });
       }
     } catch (fileError) {
-      // Se não conseguir ler o arquivo, usa a lista padrão abaixo
-      console.log('Usando playlist padrão (arquivo não encontrado)');
+      // Arquivo não encontrado ou erro ao ler - continua para vídeos padrão do R2
+      console.log('Usando vídeos padrão do R2');
     }
 
     // 🎬 VÍDEOS REAIS DO R2 - Lista dos 5 vídeos hospedados
