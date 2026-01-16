@@ -17,41 +17,46 @@ interface R2Video {
 
 export async function GET() {
   try {
-    // URL base do seu bucket R2 (público)
-    const R2_BASE_URL = process.env.R2_PUBLIC_URL || 'https://pub-59812e445a4c4fd38663f7cb852f3c24.r2.dev';
-    
-    // Lista de vídeos disponíveis no R2
-    // Você pode adaptar isso para buscar dinamicamente ou manter estático
+    // Tentar carregar playlist do arquivo JSON (gerenciada pelo admin)
+    try {
+      const fs = require('fs/promises');
+      const path = require('path');
+      const playlistPath = path.join(process.cwd(), 'data', 'video-playlist.json');
+      const fileContent = await fs.readFile(playlistPath, 'utf-8');
+      const playlist = JSON.parse(fileContent);
+      
+      if (playlist.videos && Array.isArray(playlist.videos)) {
+        return Response.json({
+          success: true,
+          videos: playlist.videos,
+          count: playlist.videos.length,
+          source: 'admin-managed'
+        });
+      }
+    } catch (fileError) {
+      // Se não conseguir ler o arquivo, usa a lista padrão abaixo
+      console.log('Usando playlist padrão (arquivo não encontrado)');
+    }
+
+    // 🎬 PLAYLIST PADRÃO (usado se o admin ainda não configurou)
     const videos: R2Video[] = [
       {
         id: 'video-001',
-        url: `${R2_BASE_URL}/Videos/5Motivos.mp4`,
-        title: '5 Motivos',
-        sizeBytes: 86210000,
+        url: 'https://play.gumlet.io/embed/SEU_VIDEO_ID_1',  // Exemplo Gumlet
+        title: 'Vídeo 1',
+        sizeBytes: 0,
       },
       {
         id: 'video-002',
-        url: `${R2_BASE_URL}/Videos/Microscópio.mp4`,
-        title: 'Microscópio',
-        sizeBytes: 53790000,
+        url: 'https://play.gumlet.io/embed/SEU_VIDEO_ID_2',
+        title: 'Vídeo 2',
+        sizeBytes: 0,
       },
       {
         id: 'video-003',
-        url: `${R2_BASE_URL}/Videos/fraxx.mp4`,
+        url: 'https://pub-59812e445a4c4fd38663f7cb852f3c24.r2.dev/Videos/fraxx.mp4',  // Exemplo R2
         title: 'Fraxx',
         sizeBytes: 50480000,
-      },
-      {
-        id: 'video-004',
-        url: `${R2_BASE_URL}/Videos/menopausa.mp4`,
-        title: 'Menopausa',
-        sizeBytes: 47260000,
-      },
-      {
-        id: 'video-005',
-        url: `${R2_BASE_URL}/Videos/pH%20Vaginal.mp4`,
-        title: 'pH Vaginal',
-        sizeBytes: 59020000,
       },
     ];
 

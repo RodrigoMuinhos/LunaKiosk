@@ -335,6 +335,61 @@ export function VideosPanel() {
           </div>
         )}
       </section>
+
+      {/* Nova seção: Adicionar vídeos manualmente */}
+      <section className="rounded-[32px] border border-[#E9DAD1] bg-white/90 px-6 py-5 shadow-sm">
+        <div className="mb-4">
+          <h3 className="text-2xl font-semibold text-[#8C7155] mb-2">➕ Adicionar Vídeos</h3>
+          <p className="text-sm text-[#7B6A5A]">
+            Cole URLs diretas do Gumlet, YouTube, Vimeo ou qualquer fonte de vídeo
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-[#4F3F2E] mb-2">
+              URL do Vídeo
+            </label>
+            <input
+              type="text"
+              placeholder="https://play.gumlet.io/embed/6768cde5..."
+              className={inputClass}
+              onBlur={(e) => {
+                const urls = e.target.value.trim().split('\n').filter(Boolean);
+                if (urls.length > 0) {
+                  const playlistJson = {
+                    videos: urls.map((url, i) => ({
+                      id: `video-${Date.now()}-${i}`,
+                      url: url,
+                      title: `Vídeo ${i + 1}`,
+                      sizeBytes: 0
+                    }))
+                  };
+                  const jsonUrl = URL.createObjectURL(
+                    new Blob([JSON.stringify(playlistJson)], { type: 'application/json' })
+                  );
+                  setPlaylistUrl(jsonUrl);
+                  window.alert(`✅ ${urls.length} vídeo(s) adicionado(s)!\n\nClique em "Salvar configurações" para aplicar.`);
+                }
+              }}
+            />
+            <p className="text-xs text-[#A38C77] mt-1">
+              💡 Dica: Cole várias URLs (uma por linha) de uma vez
+            </p>
+          </div>
+
+          <div className="rounded-[20px] border border-[#E5D9CE] bg-[#FFFCF8] p-4">
+            <h4 className="font-semibold text-[#8C7155] mb-2">📋 Exemplos de URLs:</h4>
+            <ul className="text-xs text-[#7B6A5A] space-y-1">
+              <li>• <strong>Gumlet:</strong> https://play.gumlet.io/embed/6768cde5...</li>
+              <li>• <strong>Gumlet direto:</strong> https://video.gumlet.io/abc123/main.mp4</li>
+              <li>• <strong>R2/Cloudflare:</strong> https://pub-xxx.r2.dev/video.mp4</li>
+              <li>• <strong>YouTube:</strong> https://www.youtube.com/embed/VIDEO_ID</li>
+              <li>• <strong>Qualquer MP4:</strong> https://exemplo.com/video.mp4</li>
+            </ul>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
