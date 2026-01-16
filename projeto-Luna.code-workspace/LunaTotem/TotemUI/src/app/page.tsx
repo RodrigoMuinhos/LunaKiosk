@@ -262,6 +262,43 @@ export default function Page() {
         };
     }, [currentScreen, paymentCpfDigits]);
 
+    // Auto-login silencioso para o totem
+    useEffect(() => {
+        const autoLogin = async () => {
+            if (typeof window === 'undefined') return;
+            
+            const token = window.localStorage.getItem('lv_token');
+            const hasValidToken = !!token && token !== 'undefined' && token !== 'null' && token.split('.').length === 3;
+            
+            if (hasValidToken) {
+                console.log('[TOTEM AUTO-LOGIN] Token válido encontrado');
+                return;
+            }
+
+            // Credenciais do totem (deve ser um usuário de serviço com permissões limitadas)
+            const totemEmail = process.env.NEXT_PUBLIC_TOTEM_EMAIL || 'totem@lunavita.com.br';
+            const totemPassword = process.env.NEXT_PUBLIC_TOTEM_PASSWORD || 'totem123';
+
+            console.log('[TOTEM AUTO-LOGIN] Iniciando login automático...');
+            
+            try {
+                const res = await authAPI.login(totemEmail, totemPassword);
+                window.localStorage.setItem('lv_token', res.token);
+                window.localStorage.setItem('lv_refresh', res.refreshToken || '');
+                const normalizedRole = normalizeRole(res.role);
+                if (normalizedRole) {
+                    window.localStorage.setItem('lv_role', normalizedRole);
+                }
+                setAuth(res.token, normalizedRole);
+                console.log('[TOTEM AUTO-LOGIN] ✅ Login automático realizado com sucesso');
+            } catch (error) {
+                console.error('[TOTEM AUTO-LOGIN] ❌ Erro no login automático:', error);
+            }
+        };
+
+        autoLogin();
+    }, []);
+
     useEffect(() => {
         let isActive = true;
 
