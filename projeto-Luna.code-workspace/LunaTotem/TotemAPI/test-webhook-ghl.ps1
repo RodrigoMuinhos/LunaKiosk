@@ -17,6 +17,7 @@ $payload = @{
     email = 'leo@test.com'
     phone = '(11)98765-4321'
     birth_date = '15/03/1985'
+    tenant_id = 'totem'
 } | ConvertTo-Json
 
 # TEST 1: Criar paciente

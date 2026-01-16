@@ -1,0 +1,69 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+archive/
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Tests
+tests/
+test-*.ps1
+test-*.sh
+test-*.bat
+
+# Build artifacts
+target/
+dist/
+build/
+node_modules/
+*.class
+*.jar
+!**/src/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temp files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Environment
+.env.local
+.env.*.local
+*.env.backup
+
+# KIT-CLIENTE (não precisa no Docker)
+KIT-CLIENTE/
+
+# Scripts auxiliares
+scripts-*/
+INSTRUCOES-*.txt
+PLANO-*.md
+RELATORIO*.md
+
+# Uploads (deve estar em volume)
+uploads/
+
+# Docker
+docker-compose.override-temp.yml
+Dockerfile.backup

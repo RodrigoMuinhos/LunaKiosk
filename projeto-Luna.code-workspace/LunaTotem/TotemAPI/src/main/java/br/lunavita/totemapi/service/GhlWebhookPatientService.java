@@ -144,8 +144,8 @@ public class GhlWebhookPatientService {
     private void ensurePatientCompleteness(Patient patient) {
         // Se tenantId não fornecido, usa um tenant padrão para webhooks GHL
         if (isBlank(patient.getTenantId())) {
-            patient.setTenantId("default");
-            logger.debug("[GHL] tenantId não fornecido, usando 'default'");
+            patient.setTenantId("totem");
+            logger.debug("[GHL] tenantId não fornecido, usando 'totem'");
         }
         if (isBlank(patient.getName())) {
             throw new IllegalArgumentException("Nome do paciente é obrigatório");

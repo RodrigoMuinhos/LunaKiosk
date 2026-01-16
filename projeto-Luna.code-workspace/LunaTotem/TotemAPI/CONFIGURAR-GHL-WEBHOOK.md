@@ -54,7 +54,7 @@ POST
   "email": "{{contact.email}}",
   "phone": "{{contact.phone}}",
   "birth_date": "{{contact.customField.DataNascimento}}",
-  "tenant_id": "{{location.id}}",
+  "tenant_id": "totem",
   "notes": "Criado via GHL em {{timestamp}}"
 }
 ```
@@ -77,7 +77,7 @@ POST
 |-----------|-----------|-----------|
 | `{{contact.email}}` | `email` | Email do paciente |
 | `{{contact.customField.DataNascimento}}` | `birth_date` | Data de nascimento |
-| `{{location.id}}` | `tenant_id` | ID da localização (multi-tenant) |
+| `"totem"` (fixo) | `tenant_id` | Identificador do tenant (sempre "totem") |
 | `{{contact.notes}}` | `notes` | Observações |
 
 ---
@@ -94,7 +94,7 @@ POST
   "email": "leonardo@example.com",
   "phone": "(11) 98765-4321",
   "birth_date": "15/03/1985",
-  "tenant_id": "loc_abc123",
+  "tenant_id": "totem",
   "notes": "Cliente desde 2024"
 }
 ```
