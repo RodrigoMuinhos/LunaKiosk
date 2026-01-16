@@ -38,25 +38,38 @@ export async function GET() {
       console.log('Usando playlist padrão (arquivo não encontrado)');
     }
 
-    // 🎬 PLAYLIST PADRÃO (usado se o admin ainda não configurou)
+    // 🎬 VÍDEOS REAIS DO R2 - Lista dos 5 vídeos hospedados
+    const R2_BASE_URL = 'https://pub-59812e445a4c4fd38663f7cb852f3c24.r2.dev';
     const videos: R2Video[] = [
       {
         id: 'video-001',
-        url: 'https://play.gumlet.io/embed/SEU_VIDEO_ID_1',  // Exemplo Gumlet
-        title: 'Vídeo 1',
-        sizeBytes: 0,
+        url: `${R2_BASE_URL}/Videos/5Motivos.mp4`,
+        title: '5 Motivos para Cuidar da Saúde Íntima',
+        sizeBytes: 86210000,
       },
       {
         id: 'video-002',
-        url: 'https://play.gumlet.io/embed/SEU_VIDEO_ID_2',
-        title: 'Vídeo 2',
-        sizeBytes: 0,
+        url: `${R2_BASE_URL}/Videos/Microscópio.mp4`,
+        title: 'Microscópio',
+        sizeBytes: 53790000,
       },
       {
         id: 'video-003',
-        url: 'https://pub-59812e445a4c4fd38663f7cb852f3c24.r2.dev/Videos/fraxx.mp4',  // Exemplo R2
+        url: `${R2_BASE_URL}/Videos/fraxx.mp4`,
         title: 'Fraxx',
         sizeBytes: 50480000,
+      },
+      {
+        id: 'video-004',
+        url: `${R2_BASE_URL}/Videos/menopausa.mp4`,
+        title: 'Menopausa',
+        sizeBytes: 47260000,
+      },
+      {
+        id: 'video-005',
+        url: `${R2_BASE_URL}/Videos/pH%20Vaginal.mp4`,
+        title: 'pH Vaginal',
+        sizeBytes: 59020000,
       },
     ];
 

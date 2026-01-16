@@ -19,6 +19,8 @@ export function VideosPanel() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [inactivityTimeout, setInactivityTimeout] = useState(3);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   // Carregar vídeos atuais
   const loadVideos = async () => {
@@ -46,6 +48,9 @@ export function VideosPanel() {
   const handleAddVideos = async (urls: string[]) => {
     if (urls.length === 0) return;
 
+    setSaving(true);
+    setMessage(null);
+
     const newVideos = urls.map((url, i) => ({
       id: `video-${Date.now()}-${i}`,
       url: url.trim(),
@@ -61,13 +66,16 @@ export function VideosPanel() {
       });
 
       if (response.ok) {
-        window.alert(`✅ ${urls.length} vídeo(s) adicionado(s) com sucesso!`);
+        setMessage({ type: 'success', text: `✅ ${urls.length} vídeo(s) adicionado(s) com sucesso!` });
         await loadVideos();
       } else {
-        window.alert('❌ Erro ao salvar vídeos');
+        setMessage({ type: 'error', text: '❌ Erro ao salvar vídeos' });
       }
     } catch (error) {
-      window.alert(`❌ Erro: ${(error as Error).message}`);
+      setMessage({ type: 'error', text: `❌ Erro: ${(error as Error).message}` });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMessage(null), 5000);
     }
   };
 
@@ -75,6 +83,9 @@ export function VideosPanel() {
   const handleRemoveVideo = async (id: string) => {
     const confirmed = window.confirm('Remover este vídeo?');
     if (!confirmed) return;
+
+    setSaving(true);
+    setMessage(null);
 
     const updatedVideos = videos.filter(v => v.id !== id);
     
@@ -86,16 +97,56 @@ export function VideosPanel() {
       });
 
       if (response.ok) {
-        window.alert('✅ Vídeo removido!');
+        setMessage({ type: 'success', text: '✅ Vídeo removido com sucesso!' });
         await loadVideos();
+      } else {
+        setMessage({ type: 'error', text: '❌ Erro ao remover vídeo' });
       }
     } catch (error) {
-      window.alert(`❌ Erro: ${(error as Error).message}`);
+      setMessage({ type: 'error', text: `❌ Erro: ${(error as Error).message}` });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMessage(null), 5000);
+    }
+  };
+
+  // Salvar configurações de tempo
+  const handleSaveSettings = async () => {
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch('/api/videos/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          inactivityMinutes: inactivityTimeout,
+          playlistUrl: '/api/videos/playlist-r2'
+        })
+      });
+
+      if (response.ok) {
+        setMessage({ type: 'success', text: '✅ Configurações salvas com sucesso!' });
+      } else {
+        setMessage({ type: 'error', text: '❌ Erro ao salvar configurações' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: `❌ Erro: ${(error as Error).message}` });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMessage(null), 5000);
     }
   };
 
   return (
     <div className="space-y-6 text-[#4F3F2E]">
+      {/* Mensagem de status */}
+      {message && (
+        <div className={`rounded-2xl p-4 ${message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+          <p className="font-medium">{message.text}</p>
+        </div>
+      )}
+
       {/* Header */}
       <section className="rounded-[32px] border border-[#E9DAD1] bg-white/90 px-6 py-5 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -228,19 +279,29 @@ export function VideosPanel() {
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
-          <input
-            type="number"
-            min={1}
-            max={5}
-            value={inactivityTimeout}
-            onChange={(e) => {
-              const val = Number.parseInt(e.target.value, 10);
-              setInactivityTimeout(Math.max(1, Math.min(5, val || 3)));
-            }}
-            className={inputClass + ' w-24'}
-          />
-          <span className="text-sm text-[#7B6A5A]">minutos (entre 1 e 5)</span>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min={1}
+              max={5}
+              value={inactivityTimeout}
+              onChange={(e) => {
+                const val = Number.parseInt(e.target.value, 10);
+                setInactivityTimeout(Math.max(1, Math.min(5, val || 3)));
+              }}
+              className={inputClass + ' w-24'}
+            />
+            <span className="text-sm text-[#7B6A5A]">minutos (entre 1 e 5)</span>
+          </div>
+
+          <Button
+            onClick={handleSaveSettings}
+            disabled={saving}
+            className="w-full rounded-2xl bg-[#8C7155] text-white hover:bg-[#7C6248] px-6 py-3 font-medium"
+          >
+            {saving ? '💾 Salvando...' : '💾 Salvar Configuração'}
+          </Button>
         </div>
       </section>
     </div>
