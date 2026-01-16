@@ -1,393 +1,246 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { RotateCw, Film, Link } from 'lucide-react';
+import { RotateCw, Film } from 'lucide-react';
 import { Button } from '../Button';
-import { API_BASE_URL } from '../../lib/apiConfig';
 
-type ApiResponse = {
-  success: boolean;
-  status: number;
-  error?: string;
-  warning?: string;
-  rawText?: string;
-  [key: string]: any;
-};
-
-interface ActiveVideoItem {
+interface Video {
   id: string;
-  filename: string;
-  title?: string;
-  displayOrder: number;
+  url: string;
+  title: string;
+  filename?: string;
   filePath?: string;
 }
 
 const inputClass =
   'w-full rounded-2xl border border-[#E5D9CE] bg-white px-4 py-3 text-sm text-[#4F3F2E] placeholder:text-[#B09985] focus:outline-none focus:ring-2 focus:ring-[#D3A67F]/40 focus:border-[#D3A67F]';
 
-const LOCAL_LIMIT = 15;
-
-function resolveMessage(payload: any): string {
-  if (!payload) return 'Falha desconhecida.';
-  if (typeof payload === 'string') return payload;
-  if (typeof payload.error === 'string' && payload.error.trim()) return payload.error;
-  if (typeof payload.message === 'string' && payload.message.trim()) return payload.message;
-  if (typeof payload.rawText === 'string' && payload.rawText.trim()) return payload.rawText;
-  return 'Falha desconhecida.';
-}
-
 export function VideosPanel() {
-  const [inactivityTimeout, setInactivityTimeout] = useState<number>(3);
-  const [playlistUrl, setPlaylistUrl] = useState<string>('');
-  const [savingSettings, setSavingSettings] = useState(false);
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [inactivityTimeout, setInactivityTimeout] = useState(3);
 
-  const [loadingPreview, setLoadingPreview] = useState(false);
-  const [previewWarning, setPreviewWarning] = useState<string>('');
-  const [previewVideos, setPreviewVideos] = useState<ActiveVideoItem[]>([]);
-
-  const getAuthToken = () => {
-    if (typeof window === 'undefined') return '';
-    return localStorage.getItem('lv_token') || '';
-  };
-
-  const getLocalApiUrl = (p: string) => {
-    if (typeof window === 'undefined') return p;
-    return `${window.location.origin}${p}`;
-  };
-
-  const apiRequest = async (method: string, endpoint: string, body?: any): Promise<ApiResponse> => {
-    const token = getAuthToken();
-    const headers: HeadersInit = {};
-    if (body !== undefined) {
-      headers['Content-Type'] = 'application/json';
-    }
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    const targetUrl = /^https?:\/\//i.test(endpoint) ? endpoint : `${API_BASE_URL}${endpoint}`;
-
+  // Carregar vídeos atuais
+  const loadVideos = async () => {
+    setLoading(true);
     try {
-      const response = await fetch(targetUrl, {
-        method,
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
-
-      const contentType = response.headers.get('content-type') || '';
-      let parsedData: any = null;
-      let rawText = '';
-
-      if (contentType.includes('application/json')) {
-        try {
-          parsedData = await response.json();
-        } catch {
-          parsedData = null;
-        }
+      const response = await fetch('/api/videos/playlist-r2');
+      const data = await response.json();
+      if (data.success && data.videos) {
+        setVideos(data.videos);
+      } else if (Array.isArray(data)) {
+        setVideos(data);
       }
-
-      if (parsedData === null) {
-        try {
-          rawText = await response.text();
-        } catch {
-          rawText = '';
-        }
-      }
-
-      const payload = parsedData && typeof parsedData === 'object' ? parsedData : {};
-
-      return {
-        success: response.ok,
-        status: response.status,
-        ...payload,
-        rawText,
-      };
     } catch (error) {
-      return {
-        success: false,
-        status: 0,
-        error: error instanceof Error ? error.message : 'Erro desconhecido',
-      };
-    }
-  };
-
-  const loadPreview = async () => {
-    setLoadingPreview(true);
-    setPreviewWarning('');
-    try {
-      const response = await apiRequest('GET', getLocalApiUrl('/api/videos/active'));
-      if (response.success) {
-        setPreviewWarning(typeof response.warning === 'string' ? response.warning : '');
-        const list = Array.isArray(response.videos) ? response.videos : [];
-        const mapped: ActiveVideoItem[] = list
-          .map((v: any, idx: number) => ({
-            id: String(v.id || `item:${idx}`),
-            filename: String(v.filename || ''),
-            title: typeof v.title === 'string' ? v.title : '',
-            displayOrder: Number(v.displayOrder || idx + 1),
-            filePath: typeof v.filePath === 'string' ? v.filePath : '',
-          }))
-          .filter((v) => v.id && (v.filename || v.title));
-        setPreviewVideos(mapped);
-      } else {
-        setPreviewWarning(resolveMessage(response));
-        setPreviewVideos([]);
-      }
+      console.error('Erro ao carregar vídeos:', error);
     } finally {
-      setLoadingPreview(false);
-    }
-  };
-
-  const loadSettings = async () => {
-    try {
-      const response = await apiRequest('GET', getLocalApiUrl('/api/videos/settings'));
-      if (response.success && response.settings) {
-        setPlaylistUrl(String(response.settings.playlistUrl || ''));
-        const mins = Number.parseInt(String(response.settings.inactivityMinutes ?? 3), 10);
-        const clamped = Number.isFinite(mins) ? Math.max(1, Math.min(5, mins)) : 3;
-        setInactivityTimeout(clamped);
-      }
-    } catch (error) {
-      console.warn('Falha ao carregar settings de vídeo', error);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    void loadSettings();
-    void loadPreview();
+    loadVideos();
   }, []);
 
-  const saveSettings = async () => {
-    setSavingSettings(true);
+  // Adicionar novos vídeos
+  const handleAddVideos = async (urls: string[]) => {
+    if (urls.length === 0) return;
+
+    const newVideos = urls.map((url, i) => ({
+      id: `video-${Date.now()}-${i}`,
+      url: url.trim(),
+      title: `Vídeo ${videos.length + i + 1}`,
+      sizeBytes: 0
+    }));
+
     try {
-      const response = await apiRequest('PUT', getLocalApiUrl('/api/videos/settings'), {
-        playlistUrl,
-        inactivityMinutes: inactivityTimeout,
+      const response = await fetch('/api/videos/save-playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videos: [...videos, ...newVideos] })
       });
 
-      if (response.success) {
-        const warning = typeof response.warning === 'string' ? response.warning : '';
-        window.alert(warning ? `Configurações salvas.\n\nAviso: ${warning}` : 'Configurações salvas.');
-        await loadSettings();
-        await loadPreview();
+      if (response.ok) {
+        window.alert(`✅ ${urls.length} vídeo(s) adicionado(s) com sucesso!`);
+        await loadVideos();
       } else {
-        window.alert(`Erro ao salvar configurações: ${resolveMessage(response)}`);
+        window.alert('❌ Erro ao salvar vídeos');
       }
     } catch (error) {
-      window.alert(`Erro ao salvar configurações: ${(error as Error)?.message || 'Desconhecido'}`);
-    } finally {
-      setSavingSettings(false);
+      window.alert(`❌ Erro: ${(error as Error).message}`);
     }
   };
 
-  const normalizeCount = (count: number) => Math.max(0, Math.min(LOCAL_LIMIT, count));
+  // Remover vídeo
+  const handleRemoveVideo = async (id: string) => {
+    const confirmed = window.confirm('Remover este vídeo?');
+    if (!confirmed) return;
+
+    const updatedVideos = videos.filter(v => v.id !== id);
+    
+    try {
+      const response = await fetch('/api/videos/save-playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videos: updatedVideos })
+      });
+
+      if (response.ok) {
+        window.alert('✅ Vídeo removido!');
+        await loadVideos();
+      }
+    } catch (error) {
+      window.alert(`❌ Erro: ${(error as Error).message}`);
+    }
+  };
 
   return (
     <div className="space-y-6 text-[#4F3F2E]">
+      {/* Header */}
       <section className="rounded-[32px] border border-[#E9DAD1] bg-white/90 px-6 py-5 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-[#C8A580]">Biblioteca</p>
             <h2 className="text-3xl font-semibold text-[#8C7155] flex items-center gap-2">
               <Film size={28} className="text-[#D3A67F]" />
-              Vídeos (Playlist)
+              Gerenciar Vídeos
             </h2>
             <p className="text-sm text-[#7B6A5A]">
-              Único modo suportado agora: playlist pública (Cloudflare Worker + R2) para tocar em loop.
+              Adicione vídeos do Gumlet, YouTube, Vimeo ou qualquer fonte
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="rounded-2xl bg-[#F7EFE6] px-4 py-2 text-sm text-[#7B6A5A]">
-              <span className="text-xl font-semibold text-[#8C7155]">{normalizeCount(previewVideos.length)}</span>
-              <span className="text-[#B09985]"> / {LOCAL_LIMIT} ativos</span>
+              <span className="text-xl font-semibold text-[#8C7155]">{videos.length}</span>
+              <span className="text-[#B09985]"> vídeos</span>
             </div>
             <Button
-              onClick={loadPreview}
-              disabled={loadingPreview}
+              onClick={loadVideos}
+              disabled={loading}
               variant="secondary"
               className="flex items-center justify-center rounded-full border border-[#CFB6A1] bg-white px-3 py-3 text-[#8C7155] hover:bg-[#F8F1EA]"
               size="sm"
-              title="Atualizar prévia"
+              title="Atualizar lista"
             >
-              <RotateCw className={`h-4 w-4 ${loadingPreview ? 'animate-spin' : ''}`} />
+              <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>
       </section>
 
-      <section className="rounded-[32px] border border-[#E9DAD1] bg-white/95 px-6 py-6 shadow-lg">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-[#C8A580]">Configuração</p>
-            <h3 className="text-2xl font-semibold text-[#8C7155]">URL da playlist</h3>
-            <p className="text-sm text-[#7B6A5A]">
-              Cole a URL do seu Worker <strong>/playlist.json</strong>.
-            </p>
-          </div>
-          <div className="text-xs text-[#A38C77]">Recomendado para AppWeb/Vercel (sem custo de tráfego na Railway).</div>
-        </div>
-
-        <div className="mt-5 rounded-[28px] border border-[#E9DAD1] bg-[#FFFCF8] p-4">
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-[#7B6A5A] flex items-center gap-2">
-              <span className="inline-flex items-center justify-center rounded-full bg-[#F0E2D3] p-2 text-[#A27955]">
-                <Link size={16} />
-              </span>
-              URL da playlist (JSON)
-            </label>
-            <input
-              type="text"
-              value={playlistUrl}
-              onChange={(e) => setPlaylistUrl(e.target.value)}
-              placeholder="https://SEUWORKER.workers.dev/playlist.json"
-              className={inputClass}
-            />
-            <p className="text-xs text-[#B09985]">
-              Exemplo: <strong>https://red-rice-cfdd.rodrigomuinhostattooist.workers.dev/playlist.json</strong>
-            </p>
-          </div>
-
-          <div className="mt-5 space-y-2">
-            <label className="text-sm font-semibold text-[#7B6A5A]">Tempo de inatividade (minutos)</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="number"
-                min={1}
-                max={5}
-                value={inactivityTimeout}
-                onChange={(e) => {
-                  const val = Number.parseInt(e.target.value, 10);
-                  const safe = Number.isFinite(val) ? val : 1;
-                  setInactivityTimeout(Math.max(1, Math.min(5, safe)));
-                }}
-                className={inputClass}
-              />
-              <span className="text-xs text-[#A38C77] whitespace-nowrap">Entre 1 e 5 minutos</span>
-            </div>
-            <p className="text-xs text-[#B09985]">Tempo sem interação antes de voltar ao carrossel de vídeos</p>
-          </div>
-
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-            <Button
-              type="button"
-              onClick={saveSettings}
-              disabled={savingSettings}
-              className="flex-1 rounded-2xl bg-[#8C7155] text-white hover:bg-[#7C6248]"
-            >
-              {savingSettings ? 'Salvando...' : 'Salvar configurações'}
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-[32px] border border-[#E9DAD1] bg-white/95 px-6 py-6 shadow-lg">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-[#C8A580]">Prévia</p>
-            <h3 className="text-2xl font-semibold text-[#8C7155]">Vídeos da playlist</h3>
-            <p className="text-sm text-[#7B6A5A]">Lista carregada do Worker e limitada a {LOCAL_LIMIT} itens.</p>
-          </div>
-          <div className="text-xs text-[#A38C77]">Clique em “atualizar” para recarregar.</div>
-        </div>
-
-        {previewWarning ? (
-          <div className="mt-4 rounded-2xl border border-[#FFF4D6] bg-[#FFF9EA] px-4 py-3 text-sm text-[#8A6118]">
-            {previewWarning}
-          </div>
-        ) : null}
-
-        {loadingPreview ? (
-          <div className="mt-6 rounded-[24px] border border-dashed border-[#E5D8CC] bg-[#FFFCF8] py-10 text-center text-[#7B6A5A]">
-            Carregando playlist...
-          </div>
-        ) : previewVideos.length === 0 ? (
-          <div className="mt-6 rounded-[24px] border border-dashed border-[#E5D8CC] bg-[#FFFCF8] py-10 text-center text-[#7B6A5A]">
-            Nenhum vídeo na playlist (ou a URL ainda não foi configurada).
-          </div>
-        ) : (
-          <div className="mt-6 space-y-3">
-            {previewVideos.slice(0, LOCAL_LIMIT).map((video) => (
+      {/* Lista de vídeos configurados */}
+      {videos.length > 0 && (
+        <section className="rounded-[32px] border border-[#E9DAD1] bg-white/90 px-6 py-5 shadow-sm">
+          <h3 className="text-xl font-semibold text-[#8C7155] mb-4">
+            📋 Vídeos Configurados ({videos.length})
+          </h3>
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {videos.map((video, index) => (
               <div
                 key={video.id}
-                className="rounded-[22px] border border-[#EFE2D7] bg-[#FFFCF8] px-5 py-4 shadow-sm"
+                className="flex items-center gap-3 bg-[#FFFCF8] rounded-[20px] p-4 border border-[#EFE2D7]"
               >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="text-xs uppercase tracking-[0.25em] text-[#BA9C82]">Ordem {video.displayOrder}</div>
-                    <div className="truncate text-base font-semibold text-[#4F3F2E]">
-                      {video.title || video.filename}
-                    </div>
-                    {video.filename ? <div className="truncate text-xs text-[#7B6A5A]">{video.filename}</div> : null}
-                  </div>
-                  {video.filePath ? (
-                    <a
-                      href={video.filePath}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="shrink-0 rounded-full border border-[#CFB6A1] bg-white px-4 py-2 text-sm font-semibold text-[#8C7155] hover:bg-[#F8F1EA]"
-                    >
-                      Abrir
-                    </a>
-                  ) : null}
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#F0E2D3] flex items-center justify-center text-sm font-bold text-[#8C7155]">
+                  {index + 1}
                 </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-[#4F3F2E] truncate">
+                    {video.title}
+                  </div>
+                  <div className="text-xs text-[#7B6A5A] truncate">
+                    {video.url || video.filePath}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleRemoveVideo(video.id)}
+                  className="flex-shrink-0 px-4 py-2 bg-red-50 text-red-600 rounded-full text-sm font-medium hover:bg-red-100 border border-red-200"
+                >
+                  Remover
+                </button>
               </div>
             ))}
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      {/* Nova seção: Adicionar vídeos manualmente */}
+      {/* Adicionar novos vídeos */}
       <section className="rounded-[32px] border border-[#E9DAD1] bg-white/90 px-6 py-5 shadow-sm">
         <div className="mb-4">
-          <h3 className="text-2xl font-semibold text-[#8C7155] mb-2">➕ Adicionar Vídeos</h3>
+          <h3 className="text-2xl font-semibold text-[#8C7155] mb-2">
+            ➕ Adicionar Novos Vídeos
+          </h3>
           <p className="text-sm text-[#7B6A5A]">
-            Cole URLs diretas do Gumlet, YouTube, Vimeo ou qualquer fonte de vídeo
+            Cole as URLs dos seus vídeos (uma por linha)
           </p>
         </div>
 
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-[#4F3F2E] mb-2">
-              URL do Vídeo
+              URLs dos Vídeos
             </label>
-            <input
-              type="text"
-              placeholder="https://play.gumlet.io/embed/6768cde5..."
+            <textarea
+              rows={6}
+              placeholder="https://play.gumlet.io/embed/6768cde5...&#10;https://video.gumlet.io/abc123/main.mp4&#10;https://www.youtube.com/embed/VIDEO_ID"
               className={inputClass}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                  const urls = e.currentTarget.value.trim().split('\n').filter(Boolean);
+                  if (urls.length > 0) {
+                    handleAddVideos(urls);
+                    e.currentTarget.value = '';
+                  }
+                }
+              }}
               onBlur={(e) => {
                 const urls = e.target.value.trim().split('\n').filter(Boolean);
                 if (urls.length > 0) {
-                  const playlistJson = {
-                    videos: urls.map((url, i) => ({
-                      id: `video-${Date.now()}-${i}`,
-                      url: url,
-                      title: `Vídeo ${i + 1}`,
-                      sizeBytes: 0
-                    }))
-                  };
-                  const jsonUrl = URL.createObjectURL(
-                    new Blob([JSON.stringify(playlistJson)], { type: 'application/json' })
-                  );
-                  setPlaylistUrl(jsonUrl);
-                  window.alert(`✅ ${urls.length} vídeo(s) adicionado(s)!\n\nClique em "Salvar configurações" para aplicar.`);
+                  handleAddVideos(urls);
+                  e.target.value = '';
                 }
               }}
             />
             <p className="text-xs text-[#A38C77] mt-1">
-              💡 Dica: Cole várias URLs (uma por linha) de uma vez
+              💡 Cole várias URLs de uma vez (uma por linha). Clique fora ou Ctrl+Enter para adicionar.
             </p>
           </div>
 
           <div className="rounded-[20px] border border-[#E5D9CE] bg-[#FFFCF8] p-4">
-            <h4 className="font-semibold text-[#8C7155] mb-2">📋 Exemplos de URLs:</h4>
+            <h4 className="font-semibold text-[#8C7155] mb-2">📋 Exemplos de URLs aceitas:</h4>
             <ul className="text-xs text-[#7B6A5A] space-y-1">
-              <li>• <strong>Gumlet:</strong> https://play.gumlet.io/embed/6768cde5...</li>
-              <li>• <strong>Gumlet direto:</strong> https://video.gumlet.io/abc123/main.mp4</li>
-              <li>• <strong>R2/Cloudflare:</strong> https://pub-xxx.r2.dev/video.mp4</li>
+              <li>• <strong>Gumlet Embed:</strong> https://play.gumlet.io/embed/6768cde5...</li>
+              <li>• <strong>Gumlet Direto:</strong> https://video.gumlet.io/abc123/main.mp4</li>
               <li>• <strong>YouTube:</strong> https://www.youtube.com/embed/VIDEO_ID</li>
-              <li>• <strong>Qualquer MP4:</strong> https://exemplo.com/video.mp4</li>
+              <li>• <strong>Vimeo:</strong> https://player.vimeo.com/video/123456789</li>
+              <li>• <strong>Cloudflare R2:</strong> https://pub-xxx.r2.dev/video.mp4</li>
+              <li>• <strong>Qualquer MP4:</strong> https://exemplo.com/meu-video.mp4</li>
             </ul>
           </div>
+        </div>
+      </section>
+
+      {/* Configuração de tempo */}
+      <section className="rounded-[32px] border border-[#E9DAD1] bg-white/90 px-6 py-5 shadow-sm">
+        <div className="mb-4">
+          <h3 className="text-xl font-semibold text-[#8C7155]">⏱️ Tempo de Inatividade</h3>
+          <p className="text-sm text-[#7B6A5A]">
+            Tempo sem interação antes de voltar aos vídeos
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <input
+            type="number"
+            min={1}
+            max={5}
+            value={inactivityTimeout}
+            onChange={(e) => {
+              const val = Number.parseInt(e.target.value, 10);
+              setInactivityTimeout(Math.max(1, Math.min(5, val || 3)));
+            }}
+            className={inputClass + ' w-24'}
+          />
+          <span className="text-sm text-[#7B6A5A]">minutos (entre 1 e 5)</span>
         </div>
       </section>
     </div>
