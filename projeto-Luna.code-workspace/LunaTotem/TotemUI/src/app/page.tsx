@@ -88,6 +88,7 @@ import { Shield, Video } from 'lucide-react';
 import { notifyPaymentConfirmed } from '../lib/paymentBridge';
 import { LoginModal } from '../components/auth/LoginModal';
 import { toast } from 'sonner';
+import { useR2Videos } from '../hooks/useR2Videos';
 
 type Screen =
     | 'home'
@@ -150,7 +151,24 @@ export default function Page() {
     const restVideoRef = useRef<HTMLVideoElement | null>(null);
     const [inactivityMs, setInactivityMs] = useState(5 * 60 * 1000); // default: 5 min
 
-    const [primaryVideoSrc, setPrimaryVideoSrc] = useState<string | null>(null);
+    // Hook para gerenciar vídeos do R2 com cache automático
+    const { videoUrls, loading: videosLoading, error: videosError } = useR2Videos({
+        autoCache: true, // Cacheia automaticamente
+        playlistUrl: '/api/videos/playlist-r2',
+    });
+    
+    const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+    const primaryVideoSrc = videoUrls.length > 0 ? videoUrls[currentVideoIndex] : null;
+
+    // Força o vídeo a recarregar quando o índice mudar
+    useEffect(() => {
+        if (restVideoRef.current && primaryVideoSrc) {
+            restVideoRef.current.load();
+            restVideoRef.current.play().catch(err => 
+                console.log('[VIDEO] Erro ao reproduzir:', err)
+            );
+        }
+    }, [currentVideoIndex, primaryVideoSrc]);
 
     const [currentScreen, setCurrentScreen] = useState<Screen>('home');
     const [selectedLetter, setSelectedLetter] = useState<string>('');
@@ -310,36 +328,6 @@ export default function Page() {
             cancelled = true;
         };
     }, []);
-
-    // Carrega vídeos ativos para usar no modo descanso e overlay manual
-    useEffect(() => {
-        let cancelled = false;
-        const loadVideos = async () => {
-            try {
-            const res = await fetch('/api/videos/active');
-                const data = await res.json();
-                if (cancelled) return;
-                if (data?.success && Array.isArray(data.videos)) {
-                    const first = data.videos[0];
-                    if (first) {
-                        const derivedPath = first.filePath || (first.filename ? `/uploads/videos/${first.filename}` : null);
-                        setPrimaryVideoSrc(derivedPath);
-                    } else {
-                        setPrimaryVideoSrc(null);
-                    }
-                } else {
-                    setPrimaryVideoSrc(null);
-                }
-            } catch (error) {
-                console.warn('Erro ao carregar vídeos ativos', error);
-                if (!cancelled) setPrimaryVideoSrc(null);
-            }
-        };
-        loadVideos();
-        return () => {
-            cancelled = true;
-        };
-    }, [isRestMode]);
 
     // Inatividade: volta para modo descanso após 5 min sem interação
     useEffect(() => {
@@ -902,13 +890,29 @@ export default function Page() {
                     {primaryVideoSrc ? (
                         <>
                             <video
+                                key={`rest-video-${currentVideoIndex}`}
                                 ref={restVideoRef}
                                 className="absolute inset-0 h-full w-full object-cover"
                                 muted
-                                loop
                                 playsInline
                                 autoPlay
                                 preload="auto"
+                                onLoadedMetadata={() => {
+                                    // Tenta entrar em fullscreen quando o vídeo carregar
+                                    if (restVideoRef.current) {
+                                        restVideoRef.current.requestFullscreen?.()
+                                            .catch((err) => console.log('[VIDEO] Fullscreen não suportado:', err));
+                                    }
+                                }}
+                                onEnded={() => {
+                                    console.log('[VIDEO] Vídeo terminou, avançando...');
+                                    // Avança para o próximo vídeo quando terminar
+                                    setCurrentVideoIndex((prev) => {
+                                        const next = (prev + 1) % videoUrls.length;
+                                        console.log('[VIDEO] Próximo índice:', next, '/', videoUrls.length);
+                                        return next;
+                                    });
+                                }}
                             >
                                 <source src={primaryVideoSrc} type="video/mp4" />
                                 Seu navegador não suporta vídeo.
@@ -950,11 +954,17 @@ export default function Page() {
                         </svg>
                     </button>
                     <video
+                        key={`modal-video-${currentVideoIndex}`}
                         ref={videoRef}
                         controls
                         autoPlay
                         preload="metadata"
                         className="h-full w-full rounded-[28px] border border-white/30 object-cover shadow-2xl max-w-5xl"
+                        onEnded={() => {
+                            console.log('[VIDEO MODAL] Vídeo terminou, avançando...');
+                            // Avança para o próximo vídeo quando terminar
+                            setCurrentVideoIndex((prev) => (prev + 1) % videoUrls.length);
+                        }}
                     >
                         <source src={primaryVideoSrc} type="video/mp4" />
                         Seu navegador não suporta vídeo.
