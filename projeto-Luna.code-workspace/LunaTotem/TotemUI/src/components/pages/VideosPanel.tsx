@@ -10,6 +10,7 @@ interface Video {
   title: string;
   filename?: string;
   filePath?: string;
+  editingTitle?: boolean;
 }
 
 const inputClass =
@@ -26,21 +27,12 @@ export function VideosPanel() {
   const loadVideos = async () => {
     setLoading(true);
     try {
-      // Primeiro tenta carregar vídeos customizados do localStorage
+      // Apenas carrega do localStorage (não carrega exemplos padrão)
       const customVideos = localStorage.getItem('custom-videos');
       if (customVideos) {
         setVideos(JSON.parse(customVideos));
-        setLoading(false);
-        return;
-      }
-
-      // Se não tem customizados, carrega os padrões do R2
-      const response = await fetch('/api/videos/playlist-r2');
-      const data = await response.json();
-      if (data.success && data.videos) {
-        setVideos(data.videos);
-      } else if (Array.isArray(data)) {
-        setVideos(data);
+      } else {
+        setVideos([]);
       }
     } catch (error) {
       console.error('Erro ao carregar vídeos:', error);
@@ -105,6 +97,17 @@ export function VideosPanel() {
       setSaving(false);
       setTimeout(() => setMessage(null), 5000);
     }
+  };
+
+  // Editar nome do vídeo
+  const handleUpdateVideoTitle = (id: string, newTitle: string) => {
+    const updatedVideos = videos.map(v => 
+      v.id === id ? { ...v, title: newTitle } : v
+    );
+    setVideos(updatedVideos);
+    localStorage.setItem('custom-videos', JSON.stringify(updatedVideos));
+    setMessage({ type: 'success', text: '✅ Nome atualizado!' });
+    setTimeout(() => setMessage(null), 3000);
   };
 
   // Salvar configurações de tempo
@@ -182,9 +185,12 @@ export function VideosPanel() {
                   {index + 1}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-[#4F3F2E] truncate">
-                    {video.title}
-                  </div>
+                  <input
+                    type="text"
+                    value={video.title}
+                    onChange={(e) => handleUpdateVideoTitle(video.id, e.target.value)}
+                    className="w-full font-semibold text-[#4F3F2E] bg-transparent border-none focus:outline-none focus:bg-white focus:border focus:border-[#D3A67F] focus:rounded-lg focus:px-2 focus:py-1"
+                  />
                   <div className="text-xs text-[#7B6A5A] truncate">
                     {video.url || video.filePath}
                   </div>
@@ -243,17 +249,7 @@ export function VideosPanel() {
             </p>
           </div>
 
-          <div className="rounded-[20px] border border-[#E5D9CE] bg-[#FFFCF8] p-4">
-            <h4 className="font-semibold text-[#8C7155] mb-2">📋 Exemplos de URLs aceitas:</h4>
-            <ul className="text-xs text-[#7B6A5A] space-y-1">
-              <li>• <strong>Gumlet Embed:</strong> https://play.gumlet.io/embed/6768cde5...</li>
-              <li>• <strong>Gumlet Direto:</strong> https://video.gumlet.io/abc123/main.mp4</li>
-              <li>• <strong>YouTube:</strong> https://www.youtube.com/embed/VIDEO_ID</li>
-              <li>• <strong>Vimeo:</strong> https://player.vimeo.com/video/123456789</li>
-              <li>• <strong>Cloudflare R2:</strong> https://pub-xxx.r2.dev/video.mp4</li>
-              <li>• <strong>Qualquer MP4:</strong> https://exemplo.com/meu-video.mp4</li>
-            </ul>
-          </div>
+
         </div>
       </section>
 
@@ -287,7 +283,7 @@ export function VideosPanel() {
             disabled={saving}
             className="w-full rounded-2xl bg-[#8C7155] text-white hover:bg-[#7C6248] px-6 py-3 font-medium"
           >
-            {saving ? '💾 Salvando...' : '💾 Salvar Configuração'}
+            {saving ? 'Salvando...' : 'Salvar Configuração'}
           </Button>
         </div>
       </section>
