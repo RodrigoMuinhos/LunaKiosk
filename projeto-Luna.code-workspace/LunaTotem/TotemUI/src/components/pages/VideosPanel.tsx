@@ -34,6 +34,15 @@ export function VideosPanel() {
       } else {
         setVideos([]);
       }
+
+      // Carregar tempo de inatividade salvo
+      const savedTimeout = localStorage.getItem('video-inactivity-timeout');
+      if (savedTimeout) {
+        const timeoutValue = Number.parseInt(savedTimeout, 10);
+        if (timeoutValue >= 1 && timeoutValue <= 5) {
+          setInactivityTimeout(timeoutValue);
+        }
+      }
     } catch (error) {
       console.error('Erro ao carregar vídeos:', error);
     } finally {
