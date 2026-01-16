@@ -2,27 +2,30 @@
 # Multi-stage build for optimal image size
 
 # Stage 1: Build
-FROM eclipse-temurin:21-jdk-alpine AS build
+FROM eclipse-temurin:21.0.2_13-jdk-alpine AS build
 WORKDIR /app
 
-# Install Maven (não depende do Maven Wrapper)
+# Install Maven
 RUN apk add --no-cache maven
 
 # Copy pom.xml first to leverage Docker layer caching
 COPY pom.xml ./
 
 # Download dependencies (cached layer)
-RUN mvn -B -q dependency:go-offline
+RUN mvn -B dependency:go-offline || true
 
 # Copy source code
 COPY src ./src
 
 # Build application (skip tests for faster builds)
-RUN mvn -B -q clean package -DskipTests
+RUN mvn -B clean package -DskipTests
 
 # Stage 2: Runtime
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21.0.2_13-jre-alpine
 WORKDIR /app
+
+# Install curl for healthcheck
+RUN apk add --no-cache curl
 
 # Create non-root user for security
 RUN addgroup -S spring && adduser -S spring -G spring
@@ -39,14 +42,17 @@ COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8082
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD sh -c "wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8082}/actuator/health || exit 1"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8082/actuator/health || exit 1
 
 # Run application
 ENTRYPOINT ["java", \
   "-XX:+UseContainerSupport", \
   "-XX:MaxRAMPercentage=75.0", \
+  "-XX:+UseG1GC", \
+  "-XX:MaxGCPauseMillis=100", \
   "-Djava.security.egd=file:/dev/./urandom", \
+  "-Dserver.shutdown=graceful", \
   "-jar", "app.jar"]
 
 

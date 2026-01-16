@@ -1,14 +1,51 @@
+# TotemAPI - Clinical Data Service
+# Multi-stage build for optimal image size
+
+# Stage 1: Build
 FROM maven:3.9.9-eclipse-temurin-21 AS build
 WORKDIR /app
-COPY pom.xml .
-COPY src ./src
-RUN mvn clean package -DskipTests
 
-FROM eclipse-temurin:21-jre-alpine
+# Copy pom.xml first to leverage Docker layer caching
+COPY pom.xml .
+
+# Download dependencies (cached layer)
+RUN mvn -B dependency:go-offline || true
+
+# Copy source code
+COPY src ./src
+
+# Build application (skip tests for faster builds)
+RUN mvn -B clean package -DskipTests
+
+# Stage 2: Runtime
+FROM eclipse-temurin:21.0.2_13-jre-alpine
 WORKDIR /app
-COPY --from=build /app/target/totem-api-0.0.1-SNAPSHOT.jar app.jar
-# Railway routes traffic to the port your app listens on (usually from $PORT).
-# We publish 8081 to match the expected TotemAPI service port in this repo.
+
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
+# Create non-root user for security
+RUN addgroup -S spring && adduser -S spring -G spring
+
+# Create logs and uploads directories with proper permissions
+RUN mkdir -p /app/logs /app/uploads && chown -R spring:spring /app/logs /app/uploads
+
+USER spring:spring
+
+# Copy jar from build stage
+COPY --from=build /app/target/*.jar app.jar
+
 EXPOSE 8081
-# Otimizado para plano FREE (512MB): heap 200m, metaspace 128m (Spring Security precisa)
-ENTRYPOINT ["java", "-Xmx200m", "-Xms64m", "-XX:MaxMetaspaceSize=128m", "-XX:ReservedCodeCacheSize=32m", "-Xss256k", "-XX:+UseSerialGC", "-XX:+TieredCompilation", "-XX:TieredStopAtLevel=1", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8081/actuator/health || exit 1
+
+# Optimized for Docker environment with graceful shutdown
+ENTRYPOINT ["java", \
+  "-XX:+UseContainerSupport", \
+  "-XX:MaxRAMPercentage=70.0", \
+  "-XX:+UseG1GC", \
+  "-XX:MaxGCPauseMillis=100", \
+  "-Djava.security.egd=file:/dev/./urandom", \
+  "-Dserver.shutdown=graceful", \
+  "-jar", "app.jar"]

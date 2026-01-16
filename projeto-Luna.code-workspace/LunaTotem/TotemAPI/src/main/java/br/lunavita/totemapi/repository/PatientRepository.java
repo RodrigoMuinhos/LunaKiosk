@@ -38,6 +38,16 @@ public interface PatientRepository extends JpaRepository<Patient, String> {
      */
     List<Patient> findByTenantIdAndNameContainingIgnoreCase(String tenantId, String namePart);
 
+    /**
+     * Busca paciente por identificador do GoHighLevel no tenant
+     */
+    Optional<Patient> findByTenantIdAndGhlContactId(String tenantId, String ghlContactId);
+
+    /**
+     * Busca paciente por identificador do GoHighLevel (sem filtro de tenant)
+     */
+    Optional<Patient> findByGhlContactId(String ghlContactId);
+
     // ===== MÉTODOS DEPRECADOS (NÃO USAR - SEM FILTRO DE TENANT) =====
 
     /**

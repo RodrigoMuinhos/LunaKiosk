@@ -29,6 +29,9 @@ public class Patient {
     @Column(name = "birth_date")
     private String birthDate;
 
+    @Column(name = "ghl_contact_id", unique = true)
+    private String ghlContactId;
+
     private String address;
 
     @Column(name = "health_plan")
@@ -108,6 +111,14 @@ public class Patient {
 
     public void setBirthDate(String birthDate) {
         this.birthDate = birthDate;
+    }
+
+    public String getGhlContactId() {
+        return ghlContactId;
+    }
+
+    public void setGhlContactId(String ghlContactId) {
+        this.ghlContactId = ghlContactId;
     }
 
     public String getAddress() {

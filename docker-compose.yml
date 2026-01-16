@@ -7,6 +7,7 @@ services:
       context: ./projeto-Luna.code-workspace/LunaCore/lunacore
       dockerfile: Dockerfile
     container_name: lunacore
+    restart: unless-stopped
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SERVER_PORT=8080
@@ -18,14 +19,16 @@ services:
       - TOTEM_API_BASE_URL=http://totemapi:8081
     ports:
       - "8080:8080"
+    volumes:
+      - lunacore-logs:/app/logs
     networks:
       - lunavita-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
   # ==========================================
   # LunaPay - Payment Processing Service
@@ -35,6 +38,7 @@ services:
       context: ./projeto-Luna.code-workspace/LunaPay/lunapay-api
       dockerfile: Dockerfile
     container_name: lunapay
+    restart: unless-stopped
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SERVER_PORT=8082
@@ -50,17 +54,19 @@ services:
       - ASAAS_ENVIRONMENT=${ASAAS_ENVIRONMENT}
     ports:
       - "8082:8082"
+    volumes:
+      - lunapay-logs:/app/logs
     depends_on:
       lunacore:
         condition: service_healthy
     networks:
       - lunavita-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
   # ==========================================
   # TotemAPI - Clinical Data Service
@@ -70,6 +76,7 @@ services:
       context: ./projeto-Luna.code-workspace/LunaTotem/TotemAPI
       dockerfile: Dockerfile
     container_name: totemapi
+    restart: unless-stopped
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SERVER_PORT=8081
@@ -79,17 +86,20 @@ services:
       - LUNACORE_URL=${LUNACORE_URL}
     ports:
       - "8081:8081"
+    volumes:
+      - totemapi-logs:/app/logs
+      - totemapi-uploads:/app/uploads
     depends_on:
       lunacore:
         condition: service_healthy
     networks:
       - lunavita-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
   # ==========================================
   # TotemUI - Frontend (Next.js)
@@ -99,6 +109,7 @@ services:
       context: ./projeto-Luna.code-workspace/LunaTotem/TotemUI
       dockerfile: Dockerfile
     container_name: totemui
+    restart: unless-stopped
     environment:
       - NODE_ENV=production
       # Use same-origin in the browser; Next rewrites will proxy to TotemAPI.
@@ -114,7 +125,7 @@ services:
     networks:
       - lunavita-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -127,4 +138,17 @@ networks:
   lunavita-network:
     driver: bridge
     name: lunavita-network
+
+# ==========================================
+# Volumes
+# ==========================================
+volumes:
+  lunacore-logs:
+    driver: local
+  lunapay-logs:
+    driver: local
+  totemapi-logs:
+    driver: local
+  totemapi-uploads:
+    driver: local
 
