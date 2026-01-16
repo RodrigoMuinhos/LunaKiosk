@@ -22,6 +22,7 @@ import {
     appointmentAPI,
     patientAPI,
     paymentAPI,
+    authAPI,
     type Appointment as ApiAppointment,
     type Patient as ApiPatient,
 } from '../lib/api';
