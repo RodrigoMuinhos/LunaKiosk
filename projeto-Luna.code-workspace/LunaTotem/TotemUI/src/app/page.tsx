@@ -920,17 +920,23 @@ export default function Page() {
 
             {isRestMode && (
                 <div
-                    className="fixed inset-0 z-30 flex items-center justify-center bg-black"
+                    className="fixed inset-0 z-30 flex items-center justify-center bg-black cursor-pointer"
                     onClick={exitRestMode}
+                    onTouchEnd={(e) => {
+                        e.preventDefault();
+                        exitRestMode();
+                    }}
                     role="button"
-                    aria-label="Toque no vídeo para iniciar um novo atendimento"
+                    tabIndex={0}
+                    aria-label="Toque em qualquer lugar para iniciar um novo atendimento"
+                    style={{ touchAction: 'manipulation' }}
                 >
                     {primaryVideoSrc ? (
                         <>
                             <video
                                 key={`rest-video-${currentVideoIndex}`}
                                 ref={restVideoRef}
-                                className="absolute inset-0 h-full w-full object-cover"
+                                className="absolute inset-0 h-full w-full object-cover pointer-events-none"
                                 muted
                                 playsInline
                                 autoPlay
@@ -956,9 +962,10 @@ export default function Page() {
                                 Seu navegador não suporta vídeo.
                             </video>
                             <div className="pointer-events-none absolute inset-0 bg-black/35" />
+
                             <div className="pointer-events-none relative z-10 flex flex-col items-center gap-4 text-center text-white">
                                 <div className="rounded-full bg-black/50 px-6 py-3 text-lg font-medium">
-                                    Toque no vídeo para voltar ao início
+                                    Toque em qualquer lugar da tela para iniciar
                                 </div>
                                 <div className="h-12 w-12 animate-pulse rounded-full border-2 border-white/60" />
                             </div>
@@ -976,21 +983,19 @@ export default function Page() {
 
             {isVideoOpen && primaryVideoSrc && (
                 <div
-                    className="fixed inset-0 z-30 flex items-center justify-center bg-black/90 px-4"
+                    className="fixed inset-0 z-30 flex items-center justify-center bg-black/90 px-4 cursor-pointer"
                     role="dialog"
-                    aria-label="Vídeo institucional em tela cheia"
+                    aria-label="Vídeo institucional - toque fora do vídeo para fechar"
                     onClick={closeVideoOverlay}
+                    onTouchEnd={(e) => {
+                        // Se tocar fora do vídeo, fecha
+                        if (e.target === e.currentTarget) {
+                            e.preventDefault();
+                            closeVideoOverlay();
+                        }
+                    }}
+                    style={{ touchAction: 'manipulation' }}
                 >
-                    <button
-                        type="button"
-                        onClick={closeVideoOverlay}
-                        className="absolute top-6 right-6 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 text-white transition hover:bg-white/15"
-                        aria-label="Fechar vídeo"
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M6 6L18 18M6 18L18 6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                    </button>
                     <video
                         key={`modal-video-${currentVideoIndex}`}
                         ref={videoRef}
