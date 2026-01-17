@@ -20,7 +20,6 @@ import br.lunavita.totemapi.model.Patient;
 import br.lunavita.totemapi.repository.AppointmentRepository;
 import br.lunavita.totemapi.repository.DoctorRepository;
 import br.lunavita.totemapi.repository.PatientRepository;
-import br.lunavita.totemapi.util.EncryptionUtil;
 
 @Service
 public class GhlWebhookAppointmentService {
@@ -49,7 +48,8 @@ public class GhlWebhookAppointmentService {
         String tenantId = normalizeTenantId(payload.getTenantId());
 
         // 3. Buscar ou criar paciente
-        Patient patient = findOrCreatePatient(payload, tenantId);
+        boolean[] patientWasCreated = new boolean[]{false};
+        Patient patient = findOrCreatePatient(payload, tenantId, patientWasCreated);
 
         // 4. Buscar médico se doctorId fornecido
         Doctor doctor = null;
@@ -69,12 +69,10 @@ public class GhlWebhookAppointmentService {
         logger.info("[GHL-APPOINTMENT] Consulta criada: {} para paciente {} (tenant: {})",
                 saved.getId(), patient.getId(), tenantId);
 
-        boolean patientWasCreated = patient.getId() != null && patientRepository.existsById(patient.getId());
-
         return new GhlAppointmentWebhookResult(
                 patient.getId(),
                 saved.getId(),
-                patientWasCreated,
+                patientWasCreated[0],
                 "Appointment created successfully");
     }
 
@@ -134,7 +132,7 @@ public class GhlWebhookAppointmentService {
         return tenantId;
     }
 
-    private Patient findOrCreatePatient(GhlAppointmentWebhookDto payload, String tenantId) {
+    private Patient findOrCreatePatient(GhlAppointmentWebhookDto payload, String tenantId, boolean[] wasCreatedOut) {
         String cpf = payload.getCpf().replaceAll("[^0-9]", "");
 
         // Tentar encontrar por tenant + CPF
@@ -146,6 +144,7 @@ public class GhlWebhookAppointmentService {
             
             // Atualizar dados se fornecidos
             updatePatientIfNeeded(existing, payload);
+            wasCreatedOut[0] = false;
             return patientRepository.save(existing);
         }
 
@@ -177,6 +176,7 @@ public class GhlWebhookAppointmentService {
             newPatient.setGhlContactId(payload.getContactId());
         }
 
+        wasCreatedOut[0] = true;
         return patientRepository.save(newPatient);
     }
 
