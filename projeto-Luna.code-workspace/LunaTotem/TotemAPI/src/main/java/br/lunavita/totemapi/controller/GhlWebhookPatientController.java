@@ -49,6 +49,17 @@ public class GhlWebhookPatientController {
                     "message", "Invalid webhook token"));
         }
 
+        // Validação: rejeitar templates não substituídos
+        if (containsUnprocessedTemplate(payload.getFullName()) || 
+            containsUnprocessedTemplate(payload.getEmail()) ||
+            containsUnprocessedTemplate(payload.getPhone())) {
+            logger.warn("[GHL] Template não processado detectado - name: {}, email: {}, phone: {}", 
+                    payload.getFullName(), payload.getEmail(), payload.getPhone());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "success", false,
+                    "message", "Dados contêm variáveis de template não substituídas. Verifique a configuração do webhook no GoHighLevel."));
+        }
+
         try {
             GhlWebhookResult result = ghlWebhookPatientService.upsertPatient(payload);
 
@@ -68,5 +79,16 @@ public class GhlWebhookPatientController {
                     "success", false,
                     "message", "Erro ao processar webhook"));
         }
+    }
+
+    /**
+     * Verifica se uma string contém template variables não substituídas (ex: {{contact.name}})
+     */
+    private boolean containsUnprocessedTemplate(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        // Detecta padrões como {{...}} ou {contact.xxx}
+        return value.contains("{{") && value.contains("}}");
     }
 }
