@@ -1,6 +1,7 @@
 package br.lunavita.totemapi.controller;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -15,9 +16,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import br.lunavita.totemapi.dto.PatientByCpfResponse;
 import br.lunavita.totemapi.model.Patient;
 import br.lunavita.totemapi.repository.PatientRepository;
 import br.lunavita.totemapi.security.UserContext;
@@ -89,6 +92,53 @@ public class PatientController {
                     return ResponseEntity.ok(patient);
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Endpoint simplificado: GET /api/patients/by-cpf?cpf=XXXXXXXXXXX
+     * Retorna apenas id, name, email, cpf (para auto-preenchimento no frontend)
+     */
+    @GetMapping("/by-cpf")
+    public ResponseEntity<?> getSimpleByCpf(@RequestParam String cpf, 
+            @AuthenticationPrincipal UserContext userContext,
+            HttpServletRequest request) {
+        if (userContext != null && userContext.getTenantId() != null) {
+            var patientOpt = patientRepository.findByTenantIdAndCpf(userContext.getTenantId(), cpf);
+            if (patientOpt.isPresent()) {
+                Patient patient = patientOpt.get();
+                auditService.logPatientRead(patient.getId(), getUserEmail(), getUserRole(),
+                        getIpAddress(request), getUserAgent(request));
+                PatientByCpfResponse response = new PatientByCpfResponse(
+                    patient.getId(),
+                    patient.getName(),
+                    patient.getEmail(),
+                    patient.getCpf(),
+                    patient.getPhone()
+                );
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.status(404)
+                        .body(Map.of("error", "Paciente não encontrado para o CPF informado"));
+            }
+        }
+        // Fallback sem tenant
+        var patientOpt = patientRepository.findByCpf(cpf);
+        if (patientOpt.isPresent()) {
+            Patient patient = patientOpt.get();
+            auditService.logPatientRead(patient.getId(), getUserEmail(), getUserRole(),
+                    getIpAddress(request), getUserAgent(request));
+            PatientByCpfResponse response = new PatientByCpfResponse(
+                patient.getId(),
+                patient.getName(),
+                patient.getEmail(),
+                patient.getCpf(),
+                patient.getPhone()
+            );
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.status(404)
+                    .body(Map.of("error", "Paciente não encontrado para o CPF informado"));
+        }
     }
 
     @PostMapping

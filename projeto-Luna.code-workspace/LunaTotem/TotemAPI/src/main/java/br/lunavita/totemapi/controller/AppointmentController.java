@@ -101,6 +101,80 @@ public class AppointmentController {
         return ResponseEntity.status(201).body(appointment);
     }
 
+    /**
+     * Endpoint para criar consulta por CPF (busca paciente automaticamente)
+     * POST /api/appointments/by-cpf
+     * 
+     * Body: {
+     *   "cpf": "04411750317",
+     *   "date": "2026-01-17",
+     *   "time": "13:35",
+     *   "type": "Retorno",
+     *   "amount": 8.00,
+     *   "paid": false,
+     *   "status": "aguardando",
+     *   "doctorId": "opcional"
+     * }
+     */
+    @PostMapping("/by-cpf")
+    public ResponseEntity<?> createByCpf(
+            @RequestBody br.lunavita.totemapi.dto.CreateAppointmentByCpfRequest request,
+            @AuthenticationPrincipal UserContext userContext) {
+        
+        if (userContext == null || userContext.getTenantId() == null || userContext.getTenantId().isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(java.util.Map.of("error", "Tenant information missing"));
+        }
+
+        try {
+            Appointment apt = store.createAppointmentByCpf(
+                request.getCpf(),
+                request.getDate(),
+                request.getTime(),
+                request.getType(),
+                request.getAmount(),
+                request.getPaid(),
+                request.getStatus(),
+                request.getDoctorId(),
+                userContext.getTenantId()
+            );
+
+            // Construir response DTO
+            br.lunavita.totemapi.dto.AppointmentResponse response = 
+                new br.lunavita.totemapi.dto.AppointmentResponse(
+                    apt.getId(),
+                    apt.getTenantId(),
+                    apt.getPatientId(),
+                    apt.getPatient(),
+                    apt.getPatientEmail(),
+                    apt.getDate(),
+                    apt.getTime(),
+                    apt.getType(),
+                    apt.getStatus(),
+                    apt.isPaid(),
+                    apt.getAmount(),
+                    apt.getCpf(),
+                    apt.getDoctorId(),
+                    apt.getDoctor(),
+                    apt.getSpecialty()
+                );
+
+            logger.info("[CREATE BY CPF] Consulta criada: id={}, paciente={}, data={}", 
+                    apt.getId(), apt.getPatient(), apt.getDate());
+            
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            
+        } catch (IllegalArgumentException e) {
+            logger.warn("[CREATE BY CPF] Erro de validação: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(java.util.Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("[CREATE BY CPF] Erro inesperado: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of("error", "Erro ao criar consulta"));
+        }
+    }
+
     @PostMapping("/{id}/notify")
     public ResponseEntity<Void> notify(@PathVariable String id, @RequestBody AppointmentNotificationRequest request) {
         logger.info("[CONTROLLER] POST /api/appointments/{}/notify - patientEmail={}, doctorEmail={}",

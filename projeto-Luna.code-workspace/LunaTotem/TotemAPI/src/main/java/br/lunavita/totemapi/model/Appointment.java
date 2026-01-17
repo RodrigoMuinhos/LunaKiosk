@@ -1,11 +1,12 @@
 package br.lunavita.totemapi.model;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.math.BigDecimal;
-import java.time.LocalDate;
 
 @Entity
 @Table(name = "appointments")
@@ -23,10 +24,13 @@ public class Appointment {
     @Column(name = "patient_id", nullable = false)
     private String patientId;
 
-    @Column(nullable = false)
+    @Column(name = "doctor_id")
+    private String doctorId;
+
+    @Column
     private String doctor;
 
-    @Column(nullable = false)
+    @Column
     private String specialty;
 
     @Column(nullable = false)
@@ -196,5 +200,13 @@ public class Appointment {
 
     public void setPatientEmail(String patientEmail) {
         this.patientEmail = patientEmail;
+    }
+
+    public String getDoctorId() {
+        return doctorId;
+    }
+
+    public void setDoctorId(String doctorId) {
+        this.doctorId = doctorId;
     }
 }

@@ -185,6 +185,87 @@ public class DataStoreService {
         return createAppointment(request);
     }
 
+    /**
+     * Cria consulta por CPF (busca o paciente automaticamente)
+     * 
+     * @param cpf CPF do paciente (11 dígitos)
+     * @param date Data da consulta
+     * @param time Horário da consulta (HH:mm)
+     * @param type Tipo de consulta
+     * @param amount Valor
+     * @param paid Se já está pago
+     * @param status Status inicial (default: "aguardando")
+     * @param doctorId ID do médico (opcional)
+     * @param tenantId Tenant (obrigatório)
+     * @return Appointment criado
+     * @throws IllegalArgumentException se paciente não encontrado ou doctor inválido
+     */
+    @Transactional
+    public Appointment createAppointmentByCpf(
+            String cpf, LocalDate date, String time, String type, 
+            BigDecimal amount, Boolean paid, String status, 
+            String doctorId, String tenantId) {
+        
+        // Validar tenant
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new IllegalArgumentException("Tenant ID é obrigatório");
+        }
+
+        // Buscar paciente por CPF
+        logger.info("Buscando paciente com CPF: {} (tenant: {})", maskCpf(cpf), tenantId);
+        Patient patient = patientRepository.findByTenantIdAndCpf(tenantId, cpf)
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "Paciente não encontrado para o CPF informado no tenant " + tenantId));
+        
+        // Criar appointment
+        Appointment apt = new Appointment();
+        apt.setId(UUID.randomUUID().toString());
+        apt.setTenantId(tenantId);
+        apt.setPatientId(patient.getId());
+        apt.setPatient(patient.getName());
+        apt.setPatientEmail(patient.getEmail());
+        apt.setCpf(patient.getCpf());
+        apt.setDate(date);
+        apt.setTime(time);
+        apt.setType(type);
+        apt.setAmount(amount);
+        apt.setPaid(paid != null ? paid : false);
+        apt.setStatus(status != null && !status.isBlank() ? status : "aguardando");
+        
+        // Se doctorId foi informado, buscar na tabela doctors
+        if (doctorId != null && !doctorId.isBlank()) {
+            logger.info("Buscando médico com ID: {} (tenant: {})", doctorId, tenantId);
+            Doctor doctor = doctorRepository.findByTenantIdAndId(tenantId, doctorId)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                        "Médico não encontrado para o ID informado no tenant " + tenantId));
+            
+            apt.setDoctorId(doctor.getId());
+            apt.setDoctor(doctor.getName());
+            apt.setSpecialty(doctor.getSpecialty());
+            logger.info("Consulta vinculada ao médico: {} ({})", doctor.getName(), doctor.getSpecialty());
+        } else {
+            // Consulta sem médico (permitido após migration)
+            apt.setDoctorId(null);
+            apt.setDoctor(null);
+            apt.setSpecialty(null);
+            logger.info("Consulta criada sem médico associado");
+        }
+        
+        logger.info("Salvando consulta: paciente={}, data={}, horário={}", 
+                patient.getName(), date, time);
+        return appointmentRepository.save(apt);
+    }
+
+    /**
+     * Mascara CPF para logs (mostra apenas últimos 3 dígitos)
+     */
+    private String maskCpf(String cpf) {
+        if (cpf == null || cpf.length() < 4) {
+            return "***";
+        }
+        return "*****" + cpf.substring(cpf.length() - 3);
+    }
+
     @Transactional
     public Optional<Appointment> updateStatus(String id, String status) {
         return appointmentRepository.findById(id)
