@@ -1,23 +1,33 @@
 package br.lunavita.totemapi.controller;
 
-import br.lunavita.totemapi.model.Video;
-import br.lunavita.totemapi.security.UserContext;
-import br.lunavita.totemapi.service.VideoService;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import br.lunavita.totemapi.model.Video;
+import br.lunavita.totemapi.security.UserContext;
+import br.lunavita.totemapi.service.VideoService;
 
 /**
  * Video management controller for admin operations
@@ -38,7 +48,7 @@ public class VideoController {
      * Upload a new video (admin only)
      */
     @PostMapping("/upload")
-    @PreAuthorize("hasRole('ADMINISTRACAO')")
+    @PreAuthorize("hasAnyRole('ADMINISTRACAO', 'OWNER', 'ADMIN', 'FINANCE')")
     public ResponseEntity<?> uploadVideo(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "title", required = false) String title,
@@ -79,7 +89,7 @@ public class VideoController {
      * Get all videos (admin)
      */
     @GetMapping
-    @PreAuthorize("hasRole('ADMINISTRACAO')")
+    @PreAuthorize("hasAnyRole('ADMINISTRACAO', 'OWNER', 'ADMIN', 'FINANCE')")
     public ResponseEntity<?> getAllVideos(@AuthenticationPrincipal UserContext userContext) {
         logger.info("[VIDEO-CTRL] GET / - Listando todos os vídeos");
         String tenantId = requireTenant(userContext);
@@ -108,7 +118,7 @@ public class VideoController {
      * Get video by ID (admin)
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRACAO')")
+    @PreAuthorize("hasAnyRole('ADMINISTRACAO', 'OWNER', 'ADMIN', 'FINANCE')")
     public ResponseEntity<?> getVideoById(@PathVariable UUID id,
             @AuthenticationPrincipal UserContext userContext) {
         logger.info("[VIDEO-CTRL] GET /{} - Obtendo vídeo", id);
@@ -128,7 +138,7 @@ public class VideoController {
      * Update video metadata (admin)
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRACAO')")
+    @PreAuthorize("hasAnyRole('ADMINISTRACAO', 'OWNER', 'ADMIN', 'FINANCE')")
     public ResponseEntity<?> updateVideo(
             @PathVariable UUID id,
             @RequestBody Map<String, Object> payload,
@@ -169,7 +179,7 @@ public class VideoController {
      * Delete video (admin)
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRACAO')")
+    @PreAuthorize("hasAnyRole('ADMINISTRACAO', 'OWNER', 'ADMIN', 'FINANCE')")
     public ResponseEntity<?> deleteVideo(@PathVariable UUID id,
             @AuthenticationPrincipal UserContext userContext) {
         try {
@@ -199,7 +209,7 @@ public class VideoController {
      * Reorder videos (admin)
      */
     @PostMapping("/reorder")
-    @PreAuthorize("hasRole('ADMINISTRACAO')")
+    @PreAuthorize("hasAnyRole('ADMINISTRACAO', 'OWNER', 'ADMIN', 'FINANCE')")
     public ResponseEntity<?> reorderVideos(@RequestBody List<UUID> videoIds,
             @AuthenticationPrincipal UserContext userContext) {
         try {

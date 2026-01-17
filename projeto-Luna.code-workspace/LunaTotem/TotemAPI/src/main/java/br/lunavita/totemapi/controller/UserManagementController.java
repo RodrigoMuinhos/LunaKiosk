@@ -1,7 +1,10 @@
 package br.lunavita.totemapi.controller;
 
-import br.lunavita.totemapi.model.User;
-import br.lunavita.totemapi.service.AuthService;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -13,14 +16,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import br.lunavita.totemapi.model.User;
+import br.lunavita.totemapi.service.AuthService;
 
 @RestController
 @RequestMapping("/api/users")
-@PreAuthorize("hasRole('ADMINISTRACAO')")
+@PreAuthorize("hasAnyRole('ADMINISTRACAO', 'OWNER', 'ADMIN', 'FINANCE')")
 public class UserManagementController {
 
     private final AuthService authService;

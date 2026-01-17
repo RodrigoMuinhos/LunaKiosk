@@ -37,7 +37,7 @@ class AuthController_DEPRECATED {
     }
 
     @PostMapping("/register")
-    @PreAuthorize("hasRole('ADMINISTRACAO')")
+    @PreAuthorize("hasAnyRole('ADMINISTRACAO', 'OWNER', 'ADMIN', 'FINANCE')")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
             User.UserRole role = User.UserRole.valueOf(request.role.toUpperCase());
@@ -105,7 +105,7 @@ class AuthController_DEPRECATED {
     }
 
     @PostMapping("/request-access")
-    @PreAuthorize("hasRole('ADMINISTRACAO')")
+    @PreAuthorize("hasAnyRole('ADMINISTRACAO', 'OWNER', 'ADMIN', 'FINANCE')")
     public ResponseEntity<?> requestAccess(@RequestBody AccessRequest request) {
         return ResponseEntity.status(403).body(Map.of("error", "Self-service access requests desativado"));
     }
