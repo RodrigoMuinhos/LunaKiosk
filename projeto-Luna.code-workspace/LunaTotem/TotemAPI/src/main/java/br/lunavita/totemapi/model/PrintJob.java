@@ -15,7 +15,7 @@ import java.time.Instant;
  * Garante que nenhum recibo seja perdido e permite reprocessamento.
  */
 @Entity
-@Table(name = "print_jobs", schema = "luna")
+@Table(name = "print_jobs")
 @Data
 @Builder
 @NoArgsConstructor
