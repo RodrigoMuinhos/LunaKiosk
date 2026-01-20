@@ -146,6 +146,7 @@ export default function Page() {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
     const [isRestMode, setIsRestMode] = useState(false);
     const [isVideoOpen, setIsVideoOpen] = useState(false);
+    const [isVideoOpenedByAdmin, setIsVideoOpenedByAdmin] = useState(false); // Track if video was opened by admin click
     const [isTourOpen, setIsTourOpen] = useState(false);
     const inactivityTimer = useRef<number | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -181,7 +182,10 @@ export default function Page() {
     const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
     const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
     const [paymentDecisionMode, setPaymentDecisionMode] = useState<'checkin' | 'payment'>('payment');
-    const closeVideoOverlay = () => setIsVideoOpen(false);
+    const closeVideoOverlay = () => {
+        setIsVideoOpen(false);
+        setIsVideoOpenedByAdmin(false); // Reset admin flag when closing
+    };
 
     // Payment search (CPF incremental)
     const [paymentCpfDigits, setPaymentCpfDigits] = useState('');
@@ -985,10 +989,15 @@ export default function Page() {
                 <div
                     className="fixed inset-0 z-30 flex items-center justify-center bg-black/90 px-4 cursor-pointer"
                     role="dialog"
-                    aria-label="Vídeo institucional - toque fora do vídeo para fechar"
-                    onClick={closeVideoOverlay}
+                    aria-label="Vídeo institucional - toque na tela para fechar"
+                    onClick={(e) => {
+                        // Sempre fecha ao clicar fora do vídeo, mesmo se foi aberto pelo admin
+                        if (e.target === e.currentTarget) {
+                            closeVideoOverlay();
+                        }
+                    }}
                     onTouchEnd={(e) => {
-                        // Se tocar fora do vídeo, fecha
+                        // Sempre fecha ao tocar fora do vídeo, mesmo se foi aberto pelo admin
                         if (e.target === e.currentTarget) {
                             e.preventDefault();
                             closeVideoOverlay();
@@ -1020,7 +1029,12 @@ export default function Page() {
                     type="button"
                     className="flex h-12 w-12 items-center justify-center rounded-full border text-white shadow-[0_15px_30px_rgba(140,86,60,0.25)] transition hover:scale-[1.03] disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ borderColor: 'rgba(224,198,178,0.6)', backgroundColor: 'rgba(214,170,146,0.6)' }}
-                    onClick={() => primaryVideoSrc && setIsVideoOpen(true)}
+                    onClick={() => {
+                        if (primaryVideoSrc) {
+                            setIsVideoOpen(true);
+                            setIsVideoOpenedByAdmin(true); // Mark as opened by admin
+                        }
+                    }}
                     aria-label="Assistir vídeo institucional"
                     disabled={!primaryVideoSrc}
                 >
