@@ -990,18 +990,14 @@ export default function Page() {
                     className="fixed inset-0 z-30 flex items-center justify-center bg-black/90 px-4 cursor-pointer"
                     role="dialog"
                     aria-label="Vídeo institucional - toque na tela para fechar"
-                    onClick={(e) => {
-                        // Sempre fecha ao clicar fora do vídeo, mesmo se foi aberto pelo admin
-                        if (e.target === e.currentTarget) {
-                            closeVideoOverlay();
-                        }
+                    onClick={() => {
+                        // Fecha ao clicar em QUALQUER lugar (no vídeo ou fora dele)
+                        closeVideoOverlay();
                     }}
                     onTouchEnd={(e) => {
-                        // Sempre fecha ao tocar fora do vídeo, mesmo se foi aberto pelo admin
-                        if (e.target === e.currentTarget) {
-                            e.preventDefault();
-                            closeVideoOverlay();
-                        }
+                        // Fecha ao tocar em QUALQUER lugar (no vídeo ou fora dele)
+                        e.preventDefault();
+                        closeVideoOverlay();
                     }}
                     style={{ touchAction: 'manipulation' }}
                 >
