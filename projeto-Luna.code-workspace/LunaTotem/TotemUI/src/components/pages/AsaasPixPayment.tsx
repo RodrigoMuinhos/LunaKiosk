@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PageContainer } from '../PageContainer';
 import { FlowType, getFlowSteps } from '@/lib/flowSteps';
 import { appointmentAPI, paymentAPI } from '@/lib/api';
+import { API_BASE_URL } from '@/lib/apiConfig';
 
 const createInFlightByAppointment = new Set<string>();
 const RETRY_DELAYS_MS = [800, 1500];
@@ -31,14 +32,28 @@ function formatTimeoutLabel(ms: number) {
 const PIX_POLL_TIMEOUT_MS = getPixPollTimeoutMs();
 const PIX_POLL_TIMEOUT_SECONDS = Math.floor(PIX_POLL_TIMEOUT_MS / 1000);
 
+interface Appointment {
+  id: string;
+  patient: {
+    name: string;
+    cpf: string;
+  };
+  amount: number;
+  date: string;
+  time: string;
+  doctor?: string;
+  specialty?: string;
+}
+
 interface AsaasPixPaymentProps {
   appointmentId: string;
   onComplete: () => void;
   onBack?: () => void;
   flow?: FlowType;
+  selectedAppointment?: Appointment | null;
 }
 
-export function AsaasPixPayment({ appointmentId, onComplete, onBack, flow = 'payment' }: AsaasPixPaymentProps) {
+export function AsaasPixPayment({ appointmentId, onComplete, onBack, flow = 'payment', selectedAppointment }: AsaasPixPaymentProps) {
   const [qrCodeImage, setQrCodeImage] = useState<string>('');
   const [paymentId, setPaymentId] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
@@ -210,6 +225,96 @@ export function AsaasPixPayment({ appointmentId, onComplete, onBack, flow = 'pay
       createInFlightByAppointment.delete(appointmentId);
     }
   };
+  const enqueuePrintReceipt = async () => {
+    if (!selectedAppointment) {
+      console.warn('[PRINT] Sem dados do agendamento para impressão');
+      return;
+    }
+
+    try {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('pt-BR');
+      const timeStr = now.toLocaleTimeString('pt-BR');
+      const cpfFormatted = selectedAppointment.patient.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+      const amountFormatted = selectedAppointment.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+      const formattedReceipt = `
+========================================
+       LUNA VITA CLINICA
+    RECIBO DE PAGAMENTO
+========================================
+
+Data/Hora: ${dateStr} ${timeStr}
+
+----------------------------------------
+
+DADOS DO PACIENTE
+Nome: ${selectedAppointment.patient.name}
+CPF: ${cpfFormatted}
+
+AGENDAMENTO
+Data: ${selectedAppointment.date}
+Horario: ${selectedAppointment.time}
+${selectedAppointment.doctor ? `Medico: ${selectedAppointment.doctor}` : ''}
+${selectedAppointment.specialty ? `Especialidade: ${selectedAppointment.specialty}` : ''}
+
+----------------------------------------
+
+        VALOR PAGO
+        ${amountFormatted}
+
+    Forma: PIX
+
+----------------------------------------
+
+    PAGAMENTO CONFIRMADO
+    Aguarde ser chamado
+
+  Obrigado pela preferencia!
+
+========================================
+`;
+
+      const receiptData = {
+        terminalId: 'TOTEM-001',
+        tenantId: 'tenant-1',
+        receiptType: 'PAYMENT',
+        payload: btoa(formattedReceipt),
+        priority: 0,
+        appointmentId: selectedAppointment.id,
+        metadata: JSON.stringify({
+          patientName: selectedAppointment.patient.name,
+          cpf: selectedAppointment.patient.cpf,
+          amount: selectedAppointment.amount,
+          paymentMethod: 'pix',
+          date: selectedAppointment.date,
+          time: selectedAppointment.time,
+          doctor: selectedAppointment.doctor,
+          specialty: selectedAppointment.specialty,
+          confirmedAt: new Date().toISOString(),
+        }),
+      };
+
+      const response = await fetch(`${API_BASE_URL}/api/print-queue/enqueue`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(receiptData),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('[PRINT PIX] ✅ Recibo enfileirado:', result.id);
+        console.log('[PRINT PIX] Conteúdo:\n' + formattedReceipt);
+      } else {
+        console.error('[PRINT PIX] ❌ Erro ao enfileirar recibo:', response.status);
+      }
+    } catch (error) {
+      console.error('[PRINT PIX] ❌ Erro ao enfileirar recibo:', error);
+    }
+  };
+
   const checkPaymentStatus = async () => {
     try {
       if (!paymentId) return;
@@ -231,6 +336,12 @@ export function AsaasPixPayment({ appointmentId, onComplete, onBack, flow = 'pay
           // best-effort: não bloqueia o fluxo se o backend falhar temporariamente
           console.warn('Falha ao marcar pagamento como pago no agendamento', e);
         }
+
+        // 🖨️ Enfileira recibo de impressão com dados reais
+        console.log('[PRINT PIX] 🎯 Pagamento confirmado! Enfileirando recibo...');
+        await enqueuePrintReceipt();
+
+        // Avança para tela de sucesso
         onComplete();
       }
     } catch (err) {

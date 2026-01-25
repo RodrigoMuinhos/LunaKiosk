@@ -281,8 +281,14 @@ export default function Page() {
             }
 
             // Credenciais do totem (deve ser um usuário de serviço com permissões limitadas)
-            const totemEmail = process.env.NEXT_PUBLIC_TOTEM_EMAIL || 'totem@lunavita.com.br';
-            const totemPassword = process.env.NEXT_PUBLIC_TOTEM_PASSWORD || 'totem123';
+            // Somente realiza auto-login se variáveis estiverem definidas explicitamente no .env
+            const totemEmail = process.env.NEXT_PUBLIC_TOTEM_EMAIL;
+            const totemPassword = process.env.NEXT_PUBLIC_TOTEM_PASSWORD;
+
+            if (!totemEmail || !totemPassword) {
+                console.log('[TOTEM AUTO-LOGIN] Variáveis NEXT_PUBLIC_TOTEM_EMAIL/NEXT_PUBLIC_TOTEM_PASSWORD não definidas - pulando auto-login');
+                return;
+            }
 
             console.log('[TOTEM AUTO-LOGIN] Iniciando login automático...');
             
@@ -727,6 +733,10 @@ export default function Page() {
                 cpf: selectedAppointment.patient.cpf,
                 amount: selectedAppointment.amount,
             });
+
+            // 🖨️ O backend enfileira o recibo automaticamente após confirmar o pagamento
+            // (veja PaymentController.enqueuePaymentReceipt)
+            console.log('[PRINT] Recibo será impresso automaticamente pelo backend');
         } catch (error) {
             console.error('Erro ao processar pagamento', error);
         } finally {
@@ -881,6 +891,7 @@ export default function Page() {
                         <AsaasPixPayment
                             flow={paymentDecisionMode === 'checkin' ? 'checkin' : 'payment'}
                             appointmentId={selectedAppointment.id}
+                            selectedAppointment={selectedAppointment}
                             onComplete={handlePaymentComplete}
                             onBack={resetFlow}
                         />
@@ -893,6 +904,7 @@ export default function Page() {
                         installments={installments}
                         onComplete={handlePaymentComplete}
                         onBack={() => setCurrentScreen('paymentConfirmation')}
+                        selectedAppointment={selectedAppointment}
                     />
                 ) : null;
 
